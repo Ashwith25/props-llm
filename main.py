@@ -5,9 +5,10 @@ from runner import (
 )
 from runner import llm_num_optim_runner
 from runner import llm_num_optim_semantics_runner
-import gym_maze
-import gym_navigation
+# import gym_maze
+# import gym_navigation
 from envs import nim, pong
+import os
 
 
 def main():
@@ -18,10 +19,22 @@ def main():
         default="config.yaml",
         help="Path to the config file",
     )
+    parser.add_argument(
+        "--logdir",
+        type=str,
+        default=None,
+        help="Optional override for logdir from the config file",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
+
+    # Allow command-line override of logdir used by SLURM job script
+    if args.logdir is not None:
+        config["logdir"] = args.logdir
+    else:
+        os.makedirs(config["logdir"], exist_ok=True)
 
     if config["task"] in ["cont_space_llm_num_optim", "cont_space_llm_num_optim_rndm_proj", "dist_state_llm_num_optim"]:
         llm_num_optim_runner.run_training_loop(**config)

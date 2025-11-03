@@ -79,6 +79,9 @@ class LLMNumOptimSemanticAgent:
             if world.discretize:
                 action = np.argmax(action)
                 action = np.array([action])
+            
+            # TODO: Hard-coded tanh
+            action = np.tanh(action)
             next_state, reward, done = world.step(action)
             logging_file.write(f"{state.T[0]} | {action[0]} | {reward}\n")
             if record:
@@ -144,7 +147,7 @@ class LLMNumOptimSemanticAgent:
 
         # Update the policy using llm_brain, q_table and replay_buffer
         print("Updating the policy...")
-        new_parameter_list, reasoning, api_time = self.llm_brain.llm_update_parameters_num_optim_semantics(
+        new_parameter_list, reasoning, api_time, didToolCall = self.llm_brain.llm_update_parameters_num_optim_semantics(
             str_nd_examples(self.replay_buffer, self.traj_buffer, self.rank),
             parse_parameters,
             self.training_episodes,
@@ -192,7 +195,7 @@ class LLMNumOptimSemanticAgent:
         _total_episodes = self.total_episodes
         _total_steps = self.total_steps
         _total_reward = result
-        return _cpu_time, _api_time, _total_episodes, _total_steps, _total_reward
+        return _cpu_time, _api_time, _total_episodes, _total_steps, _total_reward, didToolCall
     
 
     def evaluate_policy(self, world: BaseWorld, logdir):
