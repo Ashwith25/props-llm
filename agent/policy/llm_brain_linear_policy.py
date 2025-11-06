@@ -11,6 +11,7 @@ import time
 import socket
 from stats.inverted_double_pendulum.idp_stats import evaluate_params
 import json
+from configs.inverted_double_pendulum.idp_summarise_template import TEMPLATE
 # from ollama import chat
 
 class LLMBrain:
@@ -125,6 +126,21 @@ class LLMBrain:
         
     def parse_params(self, params):
         return ", ".join([f"params[{i}]: {p}" for i, p in enumerate(params)])
+    
+    def query_reasoning_llm(self, parameters):
+        # TODO: Hardcoded for OpenAI for now
+
+        RESP = evaluate_params(parameters)
+
+        completion = self.client.chat.completions.create(
+            model=self.llm_model_name,
+            extra_body={"reasoning_effort": "high"},
+            messages=[{
+            "role": "user",
+            "content": TEMPLATE + json.dumps(RESP),
+        }],
+        )
+        return completion.choices[0].message.content
 
     def query_llm(self):
         max_iter = [0, []]
@@ -135,55 +151,10 @@ class LLMBrain:
                     completion = self.client.chat.completions.create(
                         model=self.llm_model_name,
                         messages=self.llm_conversation,
-                        tools=self.TOOLS,
-                        tool_choice={"type": "function", "name": "evaluate_params"},
-                        # tool_choice="required",
-                        extra_body={"reasoning_effort": "medium"}
+                        extra_body={"reasoning_effort": "high"},
                     )
-                    message = completion.choices[0].message
-                    i=1
-                    tool_calls = message.tool_calls
-                    while tool_calls and i<5:
-                        self.add_llm_conversation("", "", isTool=True, body=message)
-                        for tool_call in tool_calls:
-                            print(f"*** Tool call: {tool_call} ***")
-                            if tool_call.function.name == "evaluate_params":
-                                params = json.loads(tool_call.function.arguments)
-                                tool_response = evaluate_params(**params)
-                                if tool_response.get("return_mean", 0) > max_iter[0]:
-                                    max_iter[0] = tool_response.get("return_mean", 0)
-                                    max_iter[1] = params['params']
-                                    print("MAX_ITER:", max_iter)
-                                self.add_llm_conversation(
-                                    text="",
-                                    isTool=True,
-                                    body={
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.id,
-                                        "content": str(tool_response)
-                                    },
-                                    role="assistant")
-                                completion = self.client.chat.completions.create(
-                                    model=self.llm_model_name,
-                                    messages=self.llm_conversation,
-                                    tools=self.TOOLS,
-                                    tool_choice={"type": "function", "name": "evaluate_params"},
-                                    extra_body={"reasoning_effort": "medium"}
-                                )
-                                response = completion.choices[0].message.content
-                                tool_calls = completion.choices[0].message.tool_calls
-                                didToolCall = True
-                                thinking += "\n\n" + f"Tool Iteration {i}" + "\n" + completion.choices[0].message.to_dict().get("reasoning", "No reasoning found.")
-
-                                print(f"Tool Iteration {i}")
-                        i+=1
-                    if i!=1:
-                        response = self.parse_params(max_iter[1])
-                        print("Parsed best params from tool calls:", response)
-                    else:
-                        response = completion.choices[0].message.content
-                        didToolCall = False
-                        thinking = completion.choices[0].message.reasoning
+                    response = completion.choices[0].message.content
+                    thinking = completion.choices[0].message.to_dict().get("reasoning", "")
 
                 elif self.model_group == "anthropic":
                     message = self.client.messages.create(
@@ -214,7 +185,7 @@ class LLMBrain:
             else:
                 self.add_llm_conversation(response, "model")
 
-            return response, thinking, didToolCall
+            return response, thinking, False
 
     def query_llm_multiple_response(self, num_responses, temperature):
         for attempt in range(5):
@@ -629,6 +600,8 @@ class LLMBrain:
         # new_parameters = self.query_llm()
         new_parameters_list = parse_parameters(new_parameters_with_reasoning)
 
+        explanation = self.query_reasoning_llm(new_parameters_list)
+
         return (
             new_parameters_list,
             "system:\n"
@@ -639,4 +612,5 @@ class LLMBrain:
             + thinking,
             api_time,
             didToolCall,
+            explanation
         )

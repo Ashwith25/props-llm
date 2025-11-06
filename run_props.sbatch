@@ -8,12 +8,12 @@
 #SBATCH --constraint=a100_80
 #SBATCH --partition=general
 #SBATCH --time=12:00:00
-#SBATCH --output=logs/slurm_output/trial_%j_%a.log
-#SBATCH --error=logs/slurm_output/trial_%j_%a.err
+#SBATCH --output=logs/slurm_output_IDP_b10r10/trial_%j_%a.log
+#SBATCH --error=logs/slurm_output_IDP_b10r10/trial_%j_%a.err
 
 # --- Job Configuration ---
 CONFIG_FILE="configs/inverted_double_pendulum/inverteddoublependulum_propsp.yaml"
-BASE_LOG_DIR="logs/idp_propsp_loop_50_traj_medium"
+BASE_LOG_DIR="logs/IDP_summarize_traj_20_b10R10"
 
 # --- Create a unique directory for this specific trial's output ---
 TRIAL_LOG_DIR="${BASE_LOG_DIR}/trial_${SLURM_ARRAY_TASK_ID}"

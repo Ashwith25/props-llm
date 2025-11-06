@@ -3,6 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 import gymnasium as gym
+import cv2
+from pathlib import Path
 
 # Headless-friendly render backend (harmless if unused)
 os.environ.setdefault("MUJOCO_GL", "egl")
@@ -165,13 +167,19 @@ def evaluate_params(params: Sequence[float]) -> Dict[str, Any]:
     TOL_X = 0.1
 
     # ---------------- run env ----------------
-    env = gym.make("InvertedDoublePendulum-v5")
+    env = gym.make("InvertedDoublePendulum-v5", render_mode="rgb_array")
 
     W = None
     b = float(params[-1]) if len(params) > 0 else 0.0
     per_ep = []
+    
+    # Video recording setup
+    # all_frames = []
+    # video_output_path = Path("evaluation_video.mp4")
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # video_writer = None
 
-    for _ in range(EPISODES):
+    for ep_idx in range(EPISODES):
         obs, info = env.reset()
         if W is None:
             obs_dim = np.asarray(obs).ravel().shape[0]
@@ -193,9 +201,24 @@ def evaluate_params(params: Sequence[float]) -> Dict[str, Any]:
         t = 0
 
         while not (terminated or truncated):
+            # Capture frame
+            # frame = env.render()
+            # if frame is not None:
+            #     # Add episode number to top left corner
+            #     frame_copy = frame.copy()
+            #     cv2.putText(frame_copy, f"Episode {ep_idx + 1}/{EPISODES}", 
+            #                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+            #                0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            #     all_frames.append(frame_copy)
+                
+            #     # Initialize video writer on first frame
+            #     if video_writer is None:
+            #         height, width = frame_copy.shape[:2]
+            #         video_writer = cv2.VideoWriter(str(video_output_path), fourcc, 30, (width, height))
+            
             # action
             action_value = np.asarray(obs).ravel() @ W + b
-            u = np.tanh(action_value).astype(np.float32)  # env will clip to Box
+            u = action_value.astype(np.float32)  # env will clip to Box
             obs_next, reward, terminated, truncated, info = env.step(u)
 
             kin = _extract_kinematics(env, obs)
@@ -287,6 +310,15 @@ def evaluate_params(params: Sequence[float]) -> Dict[str, Any]:
         })
 
     env.close()
+    
+    # -------- Save video --------
+    # if video_writer is not None:
+    #     for frame in all_frames:
+    #         video_writer.write(frame)
+    #     video_writer.release()
+    #     print(f"Video saved to {video_output_path}")
+    # else:
+    #     print("No frames captured for video recording")
 
     # -------- aggregate to a single iteration summary (median + IQR) --------
     df = pd.DataFrame(per_ep)
@@ -308,7 +340,7 @@ def evaluate_params(params: Sequence[float]) -> Dict[str, Any]:
         stats[c] = {"median": float(med), "q1": float(q1), "q3": float(q3)}
 
     result = {
-        "meta": {"env": "InvertedDoublePendulum-v5", "episodes": EPISODES, "tol_deg": TOL_DEG, "tol_x": TOL_X},
+        "meta": {"env": "InvertedDoublePendulum-v5", "trials": EPISODES},
         "failures": failures,
         "stats": stats,
         "return_mean": float(df["return"].mean()) if len(df) else float("nan"),

@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-LOG_DIR = "inverted_double_pendulum_propsp_10_parallel_trials"
+LOG_DIR = "idp_propsp_loop_50_traj_medium"
 main_df = pd.DataFrame()
 for directory in os.listdir(f"logs/{LOG_DIR}"):
     os.makedirs(f'plots/{LOG_DIR}', exist_ok=True)
@@ -79,8 +79,8 @@ for directory in os.listdir(f"logs/{LOG_DIR}"):
     # print(f"Standard Deviation of Total Reward: {df['Total Reward'].std():.2f}")
     # print(f"Max Total Reward: {df['Total Reward'].max():.2f}")
     # print(f"Min Total Reward: {df['Total Reward'].min():.2f}")
-    print(df['Tool Call'].value_counts())
-    print("Total", df.shape[0], "iterations\n")
+    # print(df['Tool Call'].value_counts())
+    print(f"{directory}", df.shape[0], "iterations\n")
 
 print("Keys in main_df:", main_df.columns)
 # Overall summary across all runs

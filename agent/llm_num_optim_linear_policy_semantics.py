@@ -1,6 +1,6 @@
 from agent.policy.linear_policy_no_bias import LinearPolicy as LinearPolicyNoBias
 from agent.policy.linear_policy import LinearPolicy
-from agent.policy.replay_buffer import EpisodeRewardBufferNoBias
+from agent.policy.replay_buffer import EpisodeRewardBufferNoBias, EpisodeRewardBufferNoBiasWithExplanation
 from agent.policy.replay_buffer import ReplayBuffer
 from agent.policy.llm_brain_linear_policy import LLMBrain
 from world.base_world import BaseWorld
@@ -17,6 +17,7 @@ class LLMNumOptimSemanticAgent:
         dim_state,
         max_traj_count,
         max_traj_length,
+        max_best_length,
         llm_si_template,
         llm_output_conversion_template,
         llm_model_name,
@@ -49,7 +50,7 @@ class LLMNumOptimSemanticAgent:
             )
         else:
             self.policy = LinearPolicy(dim_actions=dim_action, dim_states=dim_state)
-        self.replay_buffer = EpisodeRewardBufferNoBias(max_size=max_traj_count)
+        self.replay_buffer = EpisodeRewardBufferNoBiasWithExplanation(max_size=max_traj_count, max_best_values=max_best_length)
         self.traj_buffer = ReplayBuffer(max_traj_count, max_traj_length)
         self.llm_brain = LLMBrain(
             llm_si_template, llm_output_conversion_template, llm_model_name
@@ -80,8 +81,6 @@ class LLMNumOptimSemanticAgent:
                 action = np.argmax(action)
                 action = np.array([action])
             
-            # TODO: Hard-coded tanh
-            action = np.tanh(action)
             next_state, reward, done = world.step(action)
             logging_file.write(f"{state.T[0]} | {action[0]} | {reward}\n")
             if record:
@@ -101,11 +100,14 @@ class LLMNumOptimSemanticAgent:
             logging_filename = f"{logdir}/warmup_rollout_{episode}.txt"
             logging_file = open(logging_filename, "w")
             result = self.rollout_episode(world, logging_file)
+            explanation = self.llm_brain.query_reasoning_llm(self.policy.get_parameters())
             self.replay_buffer.add(
-                np.array(self.policy.get_parameters()).reshape(-1), world.get_accu_reward()
+                np.array(self.policy.get_parameters()).reshape(-1), world.get_accu_reward(), explanation
             )
+            logging_file.write(f"\nExplanation: {explanation}\n")
             logging_file.close()
             print(f"Result: {result}")
+        # print(self.replay_buffer.buffer)
         # self.replay_buffer.sort()
 
     def train_policy(self, world: BaseWorld, logdir):
@@ -125,29 +127,31 @@ class LLMNumOptimSemanticAgent:
             assert len(results) == self.rank
             return np.array(results).reshape(-1)
 
-        def str_nd_examples(replay_buffer: EpisodeRewardBufferNoBias, traj_buffer: ReplayBuffer, n):
+        def str_nd_examples(replay_buffer: EpisodeRewardBufferNoBiasWithExplanation, traj_buffer: ReplayBuffer, n):
 
             all_parameters = []
-            for weights, reward in replay_buffer.buffer:
+            for reward, weights, explanation in replay_buffer.buffer:
                 parameters = weights
-                all_parameters.append((parameters.reshape(-1), reward))
+                all_parameters.append((parameters.reshape(-1), reward, explanation))
 
             text = ""
             print('Num trajs in buffer:', len(traj_buffer.buffer))
             print('Num params in buffer:', len(all_parameters))
-            for idx, (parameters, reward) in enumerate(all_parameters):
+            for idx, (parameters, reward, explanation) in enumerate(all_parameters):
                 l = ""
                 for i in range(n):
                     l += f"params[{i}]: {parameters[i]:.5g}; "
                 fxy = reward
                 l += f"f(params): {fxy:.2f}\n"
+                if explanation:
+                    l += f"Episodic performance details: {explanation}\n\n"
                 # l += f"Trajectory: {traj_buffer.buffer[idx]}\n\n"
                 text += l
             return text
 
         # Update the policy using llm_brain, q_table and replay_buffer
         print("Updating the policy...")
-        new_parameter_list, reasoning, api_time, didToolCall = self.llm_brain.llm_update_parameters_num_optim_semantics(
+        new_parameter_list, reasoning, api_time, didToolCall, explanation = self.llm_brain.llm_update_parameters_num_optim_semantics(
             str_nd_examples(self.replay_buffer, self.traj_buffer, self.rank),
             parse_parameters,
             self.training_episodes,
@@ -185,7 +189,7 @@ class LLMNumOptimSemanticAgent:
             results.append(result)
         print(f"Results: {results}")
         result = np.mean(results)
-        self.replay_buffer.add(new_parameter_list, result)
+        self.replay_buffer.add(new_parameter_list, result, explanation)
         # self.replay_buffer.sort()
 
         self.training_episodes += 1
