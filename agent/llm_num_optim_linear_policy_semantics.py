@@ -119,6 +119,10 @@ class LLMNumOptimSemanticAgent:
             pattern = re.compile(r"params\[(\d+)\]:\s*([+-]?\d+(?:\.\d+)?)")
             matches = pattern.findall(s)
 
+            if not matches:
+                pattern = re.compile(r"[+-]?(?:\d*\.\d+|\d+)(?:[eE][+-]?\d+)?")
+                matches = pattern.findall(s)
+
             # Convert matched strings to float (or int if you prefer to differentiate)
             results = []
             for match in matches:
