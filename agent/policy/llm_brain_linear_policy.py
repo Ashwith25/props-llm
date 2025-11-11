@@ -12,6 +12,8 @@ import socket
 from stats.inverted_double_pendulum.idp_stats import evaluate_params
 import json
 from configs.inverted_double_pendulum.idp_summarise_template import TEMPLATE
+
+from ollama_config import ollama_base_url
 # from ollama import chat
 
 class LLMBrain:
@@ -24,51 +26,6 @@ class LLMBrain:
         self.llm_si_template = llm_si_template
         self.llm_output_conversion_template = llm_output_conversion_template
         self.llm_conversation = []
-        self.TOOLS = [{
-            "type": "function",
-            "function": {
-                "name": "evaluate_params",
-                "description": (
-                    "Run an evaluation of InvertedDoublePendulum-v5 using a linear policy "
-                    "u = [state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8]] @ W + b. "
-                    "W comes from the first 9 numbers; b is the 10th. "
-                    "Returns a SINGLE JSON summary for the iteration, use it to judge and improve the policy.\n\n"
-                    "Output JSON (concise keys):\n"
-                    "- meta: {env, episodes, tol_deg, tol_x}\n"
-                    "- failures: {time_limit, terminated, terminated_truncated, unknown, time_limit_rate}\n"
-                    "- stats: per-metric {median, q1, q3} across episodes. Metrics include:\n"
-                    "  • length, return\n"
-                    "  • upright_score (→1 upright)\n"
-                    "  • tilt1_index, tilt2_index (signed lean in [-1,1])\n"
-                    "  • rms_theta1_deg, rms_theta2_deg; theta1_p95_deg, theta2_p95_deg\n"
-                    "  • drift_x_index ([-1,1]), rms_x, rms_xdot\n"
-                    "  • rms_omega1, rms_omega2_abs; omega1_p95, omega2_abs_p95\n"
-                    "  • zero_cross_rate_theta1, zero_cross_rate_theta2 (oscillation proxies)\n"
-                    "  • mean_abs_u, rms_u, smoothness_u (mean|Δu|), sign_flip_rate_u, saturation_rate_u\n"
-                    "  • corr_theta12, corr_omega12 (coordination)\n"
-                    "  • stable_frac, stable_streak_max (time near setpoint)\n"
-                    "- return_mean: average episodic return.\n\n"
-                    "Notes: No plots. Angles reconstructed from MuJoCo joint states; link-2 absolute angle = phi + theta2."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "params": {
-                            "type": "array",
-                            "minItems": 10,
-                            "maxItems": 10,
-                            "items": {"type": "number"},
-                            "description": (
-                                "Exactly 10 floats for the policy. First 9 → observation weights (W); "
-                                "10th → scalar bias (b)."
-                            )
-                        }
-                    },
-                    "required": ["params"],
-                    "additionalProperties": False
-                }
-            }
-        }]
 
         assert llm_model_name in [
             "o1-preview",
@@ -98,11 +55,13 @@ class LLMBrain:
             if self.llm_model_name == 'gpt-oss:120b':
                 host_node = socket.gethostname()
                 asurite_id = "apoojar4"
-
+                # print(socket.gethostbyname(host_node))
+                # print(ollama_base_url())
                 self.client = OpenAI(
                     base_url=f"http://{asurite_id}@{host_node}:11434/v1",  # Local Ollama API
                     api_key="ollama"              
                 )
+                # print(f"http://{asurite_id}@{host_node}:11434/v1")
             else:
                 self.client = OpenAI()
 
@@ -127,17 +86,15 @@ class LLMBrain:
     def parse_params(self, params):
         return ", ".join([f"params[{i}]: {p}" for i, p in enumerate(params)])
     
-    def query_reasoning_llm(self, parameters):
+    def query_reasoning_llm(self, content):
         # TODO: Hardcoded for OpenAI for now
-
-        RESP = evaluate_params(parameters)
 
         completion = self.client.chat.completions.create(
             model=self.llm_model_name,
             extra_body={"reasoning_effort": "high"},
             messages=[{
             "role": "user",
-            "content": TEMPLATE + json.dumps(RESP),
+            "content": content
         }],
         )
         return completion.choices[0].message.content
@@ -571,6 +528,8 @@ class LLMBrain:
     ):
         self.reset_llm_conversation()
 
+        # print("RANK IS *********** ",rank)
+
         system_prompt = self.llm_si_template.render(
             {
                 "episode_reward_buffer_string": str(episode_reward_buffer),
@@ -600,7 +559,7 @@ class LLMBrain:
         # new_parameters = self.query_llm()
         new_parameters_list = parse_parameters(new_parameters_with_reasoning)
 
-        explanation = self.query_reasoning_llm(new_parameters_list)
+        # explanation = self.query_reasoning_llm(new_parameters_lis, stats) if summary else None
 
         return (
             new_parameters_list,
@@ -612,5 +571,4 @@ class LLMBrain:
             + thinking,
             api_time,
             didToolCall,
-            explanation
         )

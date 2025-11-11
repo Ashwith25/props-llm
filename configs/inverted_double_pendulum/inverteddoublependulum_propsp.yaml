@@ -2,13 +2,14 @@ task: cont_state_llm_num_optim_semantics
 num_episodes: 400
 gym_env_name: InvertedDoublePendulum-v5
 render_mode: null
-logdir: logs/IDP_summarise_propsP_best_10_recent_10
+logdir: logs/IDP_PropsP_baseline
 dim_actions: 1
 dim_states: 9
-max_traj_count: 10
+max_traj_count: 20
 max_traj_length: 1000
-max_best_length: 10
+max_best_length: 0
 template_dir: agent/policy/templates
+summary_template: num_optim_stats.j2
 llm_si_template_name: num_optim_semantic.j2
 llm_output_conversion_template_name: num_optim_semantic.j2
 llm_model_name: gpt-oss:120b
@@ -19,3 +20,6 @@ bias: true
 optimum: 10000
 search_step_size: 0.1
 env_desc_file: env_descriptions/inverteddoublependulum.j2
+summary_desc_file: summary_descriptions/inverteddoublependulum_summary.j2
+summary: true
+memory_strategy: default

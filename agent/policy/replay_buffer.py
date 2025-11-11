@@ -131,10 +131,12 @@ class EpisodeRewardBufferNoBiasWithExplanation:
             return self._heap + list(self.recent_buffer)
     
     def add(self, weights: np.ndarray, reward, explanation=None):
-        entry = (reward, weights, explanation)
+        entry = (reward, weights.tolist(), explanation)
+        # print(entry)
+        # print("HEAP", self._heap)
         if len(self._heap) < self.max_size:
             heapq.heappush(self._heap, entry)
-        elif reward > self._heap[0][0]:
+        elif self.max_size!=0 and reward > self._heap[0][0]:
             heapq.heapreplace(self._heap, entry)
         else:
             self.recent_buffer.append(entry)

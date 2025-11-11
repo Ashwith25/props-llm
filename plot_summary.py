@@ -3,12 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-LOG_DIR = "idp_propsp_loop_50_traj_medium"
+LOG_DIR = "ip-logs/IP_traj_70_baseline"
 main_df = pd.DataFrame()
-for directory in os.listdir(f"logs/{LOG_DIR}"):
+for directory in os.listdir(LOG_DIR):
     os.makedirs(f'plots/{LOG_DIR}', exist_ok=True)
     # Read the CSV file
-    df = pd.read_csv(os.path.join(f"logs/{LOG_DIR}", directory, 'overall_log.txt'))
+    df = pd.read_csv(os.path.join(LOG_DIR, directory, 'overall_log.txt'))
     main_df = pd.concat([main_df, df], ignore_index=True)
     # print(main_df.shape)
 
