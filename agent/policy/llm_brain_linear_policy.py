@@ -57,11 +57,29 @@ class LLMBrain:
                 asurite_id = "apoojar4"
                 # print(socket.gethostbyname(host_node))
                 # print(ollama_base_url())
+                
+                # Get the dynamic port from the environment, default to 11434 if not set
+                ollama_port = os.environ.get("OLLAMA_PORT", "11434")
+                
+                print(f"Connecting to Ollama on {host_node}:{ollama_port}")
+                
                 self.client = OpenAI(
-                    base_url=f"http://{asurite_id}@{host_node}:11434/v1",  # Local Ollama API
+                    base_url=f"http://{asurite_id}@{host_node}:{ollama_port}/v1",  # Local Ollama API
                     api_key="ollama"              
                 )
                 # print(f"http://{asurite_id}@{host_node}:11434/v1")
+            # if self.llm_model_name == 'gpt-oss:120b':
+            #     host_node = socket.gethostname()
+            #     ollama_host = os.environ.get('OLLAMA_HOST', f'{host_node}:11434')
+            #     asurite_id = "apoojar4"
+            #     print(f"http://{asurite_id}@{ollama_host}/v1")
+            #     # print(socket.gethostbyname(host_node))
+            #     # print(ollama_base_url())
+            #     self.client = OpenAI(
+            #         base_url=f"http://{asurite_id}@{ollama_host}/v1",  # Local Ollama API
+            #         api_key="ollama"              
+            #     )
+            #     # print(f"http://{asurite_id}@{host_node}:11434/v1")
             else:
                 self.client = OpenAI()
 

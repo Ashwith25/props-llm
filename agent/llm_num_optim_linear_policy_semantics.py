@@ -148,7 +148,7 @@ class LLMNumOptimSemanticAgent:
                 self.replay_buffer.add(
                     np.array(self.policy.get_parameters()).reshape(-1), world.get_accu_reward()
                 )
-            
+
             logging_file.close()
             print(f"Result: {result}")
         # print(self.replay_buffer.buffer)
@@ -161,7 +161,7 @@ class LLMNumOptimSemanticAgent:
             print("response-og:", input_text)
             s = input_text.split("\n")[0]
             print("response:", s)
-            pattern = re.compile(r"params\[(\d+)\]:\s*([+-]?\d+(?:\.\d+)?)")
+            pattern = re.compile(r"params\[(\d+)\]\s*[:=]\s*([+-]?(?:\d*\.\d+|\d+)(?:[eE][+-]?\d+)?)")
             matches = pattern.findall(s)
 
             if not matches:

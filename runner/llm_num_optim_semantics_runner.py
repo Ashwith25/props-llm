@@ -113,6 +113,8 @@ def run_training_loop(
         )
 
     print('init done')
+    print(os.environ.get('OLLAMA_HOST'))
+    print(os.environ)
 
     if not warmup_dir:
         warmup_dir = f"{logdir}/warmup"
