@@ -7,6 +7,10 @@ import os
 import traceback
 import numpy as np
 
+from stats.base_statistics import BaseStatistics
+from stats.inverted_double_pendulum.idp_statistics import IDP_Statistics
+from stats.mountain_car_discrete.mcd_statistics import MC_Statistics
+from stats.inverted_pendulum.ip_statistics import IP_Statistics
 
 def run_training_loop(
     task,
@@ -18,6 +22,7 @@ def run_training_loop(
     dim_states,
     max_traj_count,
     max_traj_length,
+    max_best_length,
     template_dir,
     llm_si_template_name,
     llm_output_conversion_template_name,
@@ -25,6 +30,10 @@ def run_training_loop(
     num_evaluation_episodes,
     warmup_episodes,
     warmup_dir,
+    summary,
+    memory_strategy,
+    summary_template = None,
+    summary_desc_file = None,
     bias=None,
     rank=None,
     optimum=1000,
@@ -34,11 +43,24 @@ def run_training_loop(
 ):
     assert task in ["dist_state_llm_num_optim_semantics", "cont_state_llm_num_optim_semantics"]
 
+    stats : BaseStatistics = None
+
+    if gym_env_name == "InvertedDoublePendulum-v5":
+        stats = IDP_Statistics()
+    elif gym_env_name == "MountainCar-v0":
+        stats = MC_Statistics()
+    elif gym_env_name == "InvertedPendulum-v5":
+        stats = IP_Statistics()
+
     jinja2_env = Environment(loader=FileSystemLoader(template_dir))
     llm_si_template = jinja2_env.get_template(llm_si_template_name)
     llm_output_conversion_template = jinja2_env.get_template(
         llm_output_conversion_template_name
     )
+    llm_summary_template = None
+    if summary:
+        assert summary_template is not None, "Summary template must be provided if summary is True"
+        llm_summary_template = jinja2_env.get_template(summary_template)
     if task == "dist_state_llm_num_optim_semantics":
         world = DiscreteStateGeneralWorld(
             gym_env_name,
@@ -74,6 +96,12 @@ def run_training_loop(
             dim_states,
             max_traj_count,
             max_traj_length,
+            max_best_length,
+            memory_strategy,
+            summary,
+            llm_summary_template,
+            summary_desc_file,
+            stats,
             llm_si_template,
             llm_output_conversion_template,
             llm_model_name,
@@ -85,6 +113,8 @@ def run_training_loop(
         )
 
     print('init done')
+    print(os.environ.get('OLLAMA_HOST'))
+    print(os.environ)
 
     if not warmup_dir:
         warmup_dir = f"{logdir}/warmup"

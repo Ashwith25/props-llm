@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 import os
 import copy
+import heapq
 np.set_printoptions(precision=2)
 
 
@@ -119,6 +120,67 @@ class EpisodeRewardBuffer:
                 f.close()
         print(self)
 
+class EpisodeRewardBufferNoBiasWithExplanation:
+    def __init__(self, max_size, max_best_values):
+        self.max_size = max_best_values
+        self.recent_buffer = deque(maxlen=max_size)
+        self._heap = []
+
+    def __getattr__(self, name):
+        if name == "buffer":
+            return self._heap + list(self.recent_buffer)
+    
+    def add(self, weights: np.ndarray, reward, explanation=None):
+        entry = (reward, weights.tolist(), explanation)
+        # print(entry)
+        # print("HEAP", self._heap)
+        if len(self._heap) < self.max_size:
+            heapq.heappush(self._heap, entry)
+        elif self.max_size!=0 and reward > self._heap[0][0]:
+            heapq.heapreplace(self._heap, entry)
+        else:
+            self.recent_buffer.append(entry)
+    
+    def sort(self):
+        if self._heap:
+            self._heap = heapq.nlargest(len(self._heap), self._heap, key=lambda x: x[0])
+            heapq.heapify(self._heap)
+    
+    def __str__(self):
+        buffer_table = "Parameters | Reward\n"
+        for reward, weights, explanation in sorted(self.buffer, key=lambda x: x[0], reverse=True):
+            buffer_table += f"{weights.reshape(1, -1)} | {reward}\n"
+            if explanation:
+                buffer_table += f"\nExplanation:\n{explanation}\n"
+        return buffer_table
+
+    def load(self, folder):
+        all_files = [os.path.join(folder, x) for x in os.listdir(folder) if x.startswith('warmup_rollout')]
+        all_files.sort(key=lambda x: int(x.split('_')[-1].split('.')[0]))
+
+        for filename in all_files:
+            with open(filename, 'r') as f:
+                lines = f.readlines()
+                parameters = []
+                for line in lines:
+                    if "parameter ends" in line:
+                        break
+                    try:
+                        parameters.append([float(x) for x in line.split(',')])
+                    except:
+                        continue
+                parameters = np.array(parameters)
+
+                rewards = []
+                for line in lines:
+                    if "Total reward" in line:
+                        try:
+                            rewards.append(float(line.split()[-1]))
+                        except:
+                            continue
+                rewards_mean = np.mean(rewards)
+                self.add(parameters, rewards_mean)
+        print(self)
 
 
 class EpisodeRewardBufferNoBias:

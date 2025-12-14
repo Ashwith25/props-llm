@@ -1,0 +1,33 @@
+Output JSON
+{
+    "meta": {
+    "env": "InvertedPendulum-v5",
+    "trials": <int>,         # episodes aggregated
+    "horizon": 1000,         # step cap
+    "theta_limit": 0.2       # env's healthy bound (rad)
+    },
+    "failures": {
+    "time_limit": <int>, "terminated": <int>, "terminated_truncated": <int>, "unknown": <int>,
+    "time_limit_rate": <float>,        # fraction that reached horizon
+    "success_rate": <float>            # same as time_limit_rate here
+    },
+    "stats": { "<metric>": {"median": <float>, "q1": <float>, "q3": <float>}, ... },
+    "return_mean": <float>
+}
+
+Metrics (concise meanings):
+
+length, return                 : survival steps and reward sum (higher is better)
+success                        : 1 if reached horizon; else 0
+upright_score                  : mean cos(theta); →1 when upright
+tilt_index                     : signed lean in [-1,1] (- left, + right)
+rms_theta_deg, theta_p95_deg   : wobble magnitude and rare large tilts (deg)
+healthy_frac, healthy_streak_max : time and longest run with |theta| < 0.2 rad
+stable_frac, stable_streak_max : stricter tube |theta| < 5°
+drift_x_index                  : cart side bias in [-1,1]
+rms_x, rms_xdot                : cart displacement and jitter
+rms_omega, omega_p95           : angular velocity level and bursts
+zero_cross_rate_theta          : how often theta changes sign (oscillation)
+mean_abs_u, rms_u              : control magnitude / energy
+smoothness_u, sign_flip_rate_u : step-to-step action change / chatter
+saturation_rate_u              : fraction near actuation limits

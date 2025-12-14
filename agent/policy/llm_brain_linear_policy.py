@@ -11,6 +11,9 @@ import time
 import socket
 from stats.inverted_double_pendulum.idp_stats import evaluate_params
 import json
+from configs.inverted_double_pendulum.idp_summarise_template import TEMPLATE
+
+from ollama_config import ollama_base_url
 # from ollama import chat
 
 class LLMBrain:
@@ -23,51 +26,6 @@ class LLMBrain:
         self.llm_si_template = llm_si_template
         self.llm_output_conversion_template = llm_output_conversion_template
         self.llm_conversation = []
-        self.TOOLS = [{
-            "type": "function",
-            "function": {
-                "name": "evaluate_params",
-                "description": (
-                    "Run an evaluation of InvertedDoublePendulum-v5 using a linear policy "
-                    "u = [state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7], state[8]] @ W + b. "
-                    "W comes from the first 9 numbers; b is the 10th. "
-                    "Returns a SINGLE JSON summary for the iteration, use it to judge and improve the policy.\n\n"
-                    "Output JSON (concise keys):\n"
-                    "- meta: {env, episodes, tol_deg, tol_x}\n"
-                    "- failures: {time_limit, terminated, terminated_truncated, unknown, time_limit_rate}\n"
-                    "- stats: per-metric {median, q1, q3} across episodes. Metrics include:\n"
-                    "  • length, return\n"
-                    "  • upright_score (→1 upright)\n"
-                    "  • tilt1_index, tilt2_index (signed lean in [-1,1])\n"
-                    "  • rms_theta1_deg, rms_theta2_deg; theta1_p95_deg, theta2_p95_deg\n"
-                    "  • drift_x_index ([-1,1]), rms_x, rms_xdot\n"
-                    "  • rms_omega1, rms_omega2_abs; omega1_p95, omega2_abs_p95\n"
-                    "  • zero_cross_rate_theta1, zero_cross_rate_theta2 (oscillation proxies)\n"
-                    "  • mean_abs_u, rms_u, smoothness_u (mean|Δu|), sign_flip_rate_u, saturation_rate_u\n"
-                    "  • corr_theta12, corr_omega12 (coordination)\n"
-                    "  • stable_frac, stable_streak_max (time near setpoint)\n"
-                    "- return_mean: average episodic return.\n\n"
-                    "Notes: No plots. Angles reconstructed from MuJoCo joint states; link-2 absolute angle = phi + theta2."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "params": {
-                            "type": "array",
-                            "minItems": 10,
-                            "maxItems": 10,
-                            "items": {"type": "number"},
-                            "description": (
-                                "Exactly 10 floats for the policy. First 9 → observation weights (W); "
-                                "10th → scalar bias (b)."
-                            )
-                        }
-                    },
-                    "required": ["params"],
-                    "additionalProperties": False
-                }
-            }
-        }]
 
         assert llm_model_name in [
             "o1-preview",
@@ -97,11 +55,31 @@ class LLMBrain:
             if self.llm_model_name == 'gpt-oss:120b':
                 host_node = socket.gethostname()
                 asurite_id = "apoojar4"
-
+                # print(socket.gethostbyname(host_node))
+                # print(ollama_base_url())
+                
+                # Get the dynamic port from the environment, default to 11434 if not set
+                ollama_port = os.environ.get("OLLAMA_PORT", "11434")
+                
+                print(f"Connecting to Ollama on {host_node}:{ollama_port}")
+                
                 self.client = OpenAI(
-                    base_url=f"http://{asurite_id}@{host_node}:11434/v1",  # Local Ollama API
+                    base_url=f"http://{asurite_id}@{host_node}:{ollama_port}/v1",  # Local Ollama API
                     api_key="ollama"              
                 )
+                # print(f"http://{asurite_id}@{host_node}:11434/v1")
+            # if self.llm_model_name == 'gpt-oss:120b':
+            #     host_node = socket.gethostname()
+            #     ollama_host = os.environ.get('OLLAMA_HOST', f'{host_node}:11434')
+            #     asurite_id = "apoojar4"
+            #     print(f"http://{asurite_id}@{ollama_host}/v1")
+            #     # print(socket.gethostbyname(host_node))
+            #     # print(ollama_base_url())
+            #     self.client = OpenAI(
+            #         base_url=f"http://{asurite_id}@{ollama_host}/v1",  # Local Ollama API
+            #         api_key="ollama"              
+            #     )
+            #     # print(f"http://{asurite_id}@{host_node}:11434/v1")
             else:
                 self.client = OpenAI()
 
@@ -125,6 +103,19 @@ class LLMBrain:
         
     def parse_params(self, params):
         return ", ".join([f"params[{i}]: {p}" for i, p in enumerate(params)])
+    
+    def query_reasoning_llm(self, content):
+        # TODO: Hardcoded for OpenAI for now
+
+        completion = self.client.chat.completions.create(
+            model=self.llm_model_name,
+            extra_body={"reasoning_effort": "high"},
+            messages=[{
+            "role": "user",
+            "content": content
+        }],
+        )
+        return completion.choices[0].message.content
 
     def query_llm(self):
         max_iter = [0, []]
@@ -135,55 +126,10 @@ class LLMBrain:
                     completion = self.client.chat.completions.create(
                         model=self.llm_model_name,
                         messages=self.llm_conversation,
-                        tools=self.TOOLS,
-                        tool_choice={"type": "function", "name": "evaluate_params"},
-                        # tool_choice="required",
-                        extra_body={"reasoning_effort": "medium"}
+                        extra_body={"reasoning_effort": "high"},
                     )
-                    message = completion.choices[0].message
-                    i=1
-                    tool_calls = message.tool_calls
-                    while tool_calls and i<5:
-                        self.add_llm_conversation("", "", isTool=True, body=message)
-                        for tool_call in tool_calls:
-                            print(f"*** Tool call: {tool_call} ***")
-                            if tool_call.function.name == "evaluate_params":
-                                params = json.loads(tool_call.function.arguments)
-                                tool_response = evaluate_params(**params)
-                                if tool_response.get("return_mean", 0) > max_iter[0]:
-                                    max_iter[0] = tool_response.get("return_mean", 0)
-                                    max_iter[1] = params['params']
-                                    print("MAX_ITER:", max_iter)
-                                self.add_llm_conversation(
-                                    text="",
-                                    isTool=True,
-                                    body={
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.id,
-                                        "content": str(tool_response)
-                                    },
-                                    role="assistant")
-                                completion = self.client.chat.completions.create(
-                                    model=self.llm_model_name,
-                                    messages=self.llm_conversation,
-                                    tools=self.TOOLS,
-                                    tool_choice={"type": "function", "name": "evaluate_params"},
-                                    extra_body={"reasoning_effort": "medium"}
-                                )
-                                response = completion.choices[0].message.content
-                                tool_calls = completion.choices[0].message.tool_calls
-                                didToolCall = True
-                                thinking += "\n\n" + f"Tool Iteration {i}" + "\n" + completion.choices[0].message.to_dict().get("reasoning", "No reasoning found.")
-
-                                print(f"Tool Iteration {i}")
-                        i+=1
-                    if i!=1:
-                        response = self.parse_params(max_iter[1])
-                        print("Parsed best params from tool calls:", response)
-                    else:
-                        response = completion.choices[0].message.content
-                        didToolCall = False
-                        thinking = completion.choices[0].message.reasoning
+                    response = completion.choices[0].message.content
+                    thinking = completion.choices[0].message.to_dict().get("reasoning", "")
 
                 elif self.model_group == "anthropic":
                     message = self.client.messages.create(
@@ -214,7 +160,7 @@ class LLMBrain:
             else:
                 self.add_llm_conversation(response, "model")
 
-            return response, thinking, didToolCall
+            return response, thinking, False
 
     def query_llm_multiple_response(self, num_responses, temperature):
         for attempt in range(5):
@@ -600,6 +546,8 @@ class LLMBrain:
     ):
         self.reset_llm_conversation()
 
+        # print("RANK IS *********** ",rank)
+
         system_prompt = self.llm_si_template.render(
             {
                 "episode_reward_buffer_string": str(episode_reward_buffer),
@@ -628,6 +576,8 @@ class LLMBrain:
         # )
         # new_parameters = self.query_llm()
         new_parameters_list = parse_parameters(new_parameters_with_reasoning)
+
+        # explanation = self.query_reasoning_llm(new_parameters_lis, stats) if summary else None
 
         return (
             new_parameters_list,

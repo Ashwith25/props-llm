@@ -53,12 +53,12 @@ class ContinualSpaceGeneralWorld(BaseWorld):
         state, reward, terminated, truncated, _ = self.env.step(action)
         self.accu_reward += reward
 
-        if self.steps >= self.max_traj_length or terminated or truncated:
-            done = True
-        else:
-            done = False
+        # if self.steps >= self.max_traj_length or terminated or truncated:
+        #     done = True
+        # else:
+        #     done = False
 
-        return state, reward, done
+        return state, reward, terminated, (self.steps >= self.max_traj_length or truncated)
 
     def get_accu_reward(self):
         return self.accu_reward

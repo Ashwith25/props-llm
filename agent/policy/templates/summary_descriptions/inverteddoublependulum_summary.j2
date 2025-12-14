@@ -1,0 +1,67 @@
+Output (JSON)
+{
+"meta": {
+  "env": "InvertedDoublePendulum-v5",
+  "trials": 20
+},
+"failures": {
+  "time_limit": <int>,             # #trials that reached horizon
+  "terminated": <int>,             # #trials ended by failure
+  "terminated_truncated": <int>,   # (rare) both flags
+  "unknown": <int>,                # if neither flag identified
+  "time_limit_rate": <float>       # fraction in [0,1]
+},
+"stats": {                         # per-metric summary across trials
+  "<metric_name>": {"median": <float>, "q1": <float>, "q3": <float>},
+  ...
+},
+"return_mean": <float>              # mean episodic return over 20 trials
+}
+
+Metrics (concise meanings)
+
+### Outcomes
+length              : steps survived (higher = better)
+return              : sum of rewards (higher = better)
+
+### Uprightness & bias (angles reconstructed from MuJoCo qpos)
+upright_score       : mean( (cos(phi)+cos(theta2))/2 ), →1 when upright
+tilt1_index         : signed lean of link-1 in [-1,1] (- left, + right)
+tilt2_index         : signed lean of link-2 in [-1,1]
+rms_theta1_deg      : RMS angle of link-1 (deg), steadiness proxy
+rms_theta2_deg      : RMS angle of link-2 (deg)
+theta1_p95_deg      : 95th percentile |angle| (deg), rare big swings
+theta2_p95_deg      : 95th percentile |angle| (deg)
+
+### Cart centering
+drift_x_index       : signed residency of cart x in [-1,1] (center ~ 0)
+rms_x               : RMS cart position (lower = more centered)
+rms_xdot            : RMS cart velocity (lower = less jitter)
+
+### Motion intensity (angular velocities)
+rms_omega1          : RMS ω of link-1
+rms_omega2_abs      : RMS absolute ω of link-2 (ω1 + ω2_rel)
+omega1_p95          : 95th percentile |ω1|
+omega2_abs_p95      : 95th percentile |ω2_abs|
+zero_cross_rate_theta1 : rate sign(φ_t) flips (oscillation proxy)
+zero_cross_rate_theta2 : rate sign(θ2_t) flips
+
+### Control / effort (continuous action u)
+mean_abs_u          : avg |u| (energy proxy)
+rms_u               : RMS u (penalizes bursts)
+smoothness_u        : mean |Δu| step-to-step (lower = smoother)
+sign_flip_rate_u    : rate sign(u_t) flips (chatter proxy)
+saturation_rate_u   : fraction |u| > 0.9 * action_limit (rail-hitting)
+
+### Coordination
+corr_theta12        : corr(link-1 angle, link-2 absolute angle)
+corr_omega12        : corr(ω1, ω2_abs)
+
+### Stability time
+stable_frac         : fraction of steps with |φ|,|θ2|<5° and |x|<0.1
+stable_streak_max   : longest consecutive run satisfying the above
+
+### Notes
+- Angles: phi = hinge (cart↔link1), theta2 = hinge2 (link2 relative to link1).
+- Absolute angle of link-2 is (phi + theta2).
+- The function returns ONE compact JSON for the whole iteration (20 trials).

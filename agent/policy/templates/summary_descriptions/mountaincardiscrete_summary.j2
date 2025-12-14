@@ -1,0 +1,25 @@
+Output (JSON)
+{
+    "meta": {"env": "MountainCar-v0", "trials": <int>, "horizon": 200, "goal_x": 0.5},
+    "failures": {
+    "time_limit": <int>, "terminated": <int>, "terminated_truncated": <int>, "unknown": <int>,
+    "time_limit_rate": <float>, "success_rate": <float>
+    },
+    "stats": { "<metric>": {"median": <float>, "q1": <float>, "q3": <float>}, ... },
+    "return_mean": <float>
+}
+
+Metrics (concise meanings)
+
+length, return                      : episode length and sum of rewards (higher is better)
+success, steps_to_goal              : success flag and first step reaching x >= goal (lower is better)
+x_max/x_min/x_range                 : coverage and momentum amplitude
+right_half_frac / valley_frac       : residency near goal side / near left wall
+goal_zone_frac                      : fraction of steps near the goal ridge
+drift_x_index                       : signed position bias in [-1,1] (right +, left -)
+rms_x, rms_v, v_p95, zero_cross_rate_v, stall_rate : stability/momentum proxies
+left_rate/idle_rate/right_rate      : action distribution
+action_flip_rate, smoothness_a      : control consistency (lower is smoother)
+mean_push_rate, push_bias_index     : effort / left-right bias in actions
+corr_action_vel                     : alignment of push direction with velocity
+bounce_left                         : boundary contacts (lower is better)
