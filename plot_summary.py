@@ -3,9 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-LOG_DIR = "ip-logs/IP_traj_70_baseline"
+LOG_DIR = "idp-ablation-logs/with-values/traj20"
 main_df = pd.DataFrame()
+max_df = pd.DataFrame()
 for directory in os.listdir(LOG_DIR):
+    # if directory == "trial_5":
+    #     continue
     os.makedirs(f'plots/{LOG_DIR}', exist_ok=True)
     # Read the CSV file
     df = pd.read_csv(os.path.join(LOG_DIR, directory, 'overall_log.txt'))
@@ -46,6 +49,10 @@ for directory in os.listdir(LOG_DIR):
     plt.savefig(f'plots/{LOG_DIR}/reward_vs_iteration_{directory}.png', dpi=300)
     plt.show()
 
+    # Store the max reward row in max_df
+    max_row = df.loc[df['Total Reward'].idxmax()]
+    max_df = pd.concat([max_df, max_row.to_frame().T], ignore_index=True)
+
     # # Plot 2: CPU Time and API Time vs Rewards (dual y-axes)
     # fig, ax1 = plt.subplots(figsize=(10, 6))
 
@@ -81,7 +88,7 @@ for directory in os.listdir(LOG_DIR):
     # print(f"Min Total Reward: {df['Total Reward'].min():.2f}")
     # print(df['Tool Call'].value_counts())
     print(f"{directory}", df.shape[0], "iterations\n")
-
+print(max_df)
 print("Keys in main_df:", main_df.columns)
 # Overall summary across all runs
 print("\nOverall Summary Statistics Across All Runs:")
@@ -91,4 +98,12 @@ print(f"Average Total Reward: {main_df[' Total Reward'].mean():.2f}")
 print(f"Standard Deviation of Total Reward: {main_df[' Total Reward'].std():.2f}")
 print(f"Max Total Reward: {main_df[' Total Reward'].max():.2f}")
 print(f"Min Total Reward: {main_df[' Total Reward'].min():.2f}")
+
+print(f"\n\nAverage Total Reward: {max_df['Total Reward'].mean():.2f}")
+print(f"Standard Deviation of Total Reward: {max_df['Total Reward'].std():.2f}")
+print(f"Max Total Reward: {max_df['Total Reward'].max():.2f}")
+print(f"Min Total Reward: {max_df['Total Reward'].min():.2f}")
+
+# print("\nMax Reward Summary Across All Runs:")
+# print(max_df[['Iteration', ' Total Reward', 'CPU Time', 'API Time']])
 # print(f"Total tool")

@@ -5,7 +5,7 @@ render_mode: null
 logdir: logs/IP_propsp_baseline
 dim_actions: 1
 dim_states: 4
-max_traj_count: 70
+max_traj_count: 20
 max_traj_length: 1000
 max_best_length: 0
 template_dir: agent/policy/templates
@@ -21,5 +21,5 @@ optimum: 1000
 search_step_size: 1.0
 env_desc_file: env_descriptions/invertedpendulum.j2
 summary_desc_file: summary_descriptions/invertedpendulum_summary.j2
-summary: false
-memory_strategy: default
+summary: true
+memory_strategy: best

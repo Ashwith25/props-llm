@@ -11,11 +11,11 @@ f(params) is the episodic reward of the policy.
 
 # Strategy Guide (Hints for Convergence):
 To reach the global optimum (Reward > 9000), consider the following control hierarchy:
-1. **Primary Stability (The Second Pole):** The most critical factor is keeping the top pole upright. This typically requires **strong negative feedback** on `params[2]` (Sin(theta2)). Successful policies often have `params[2]` in the range of **-3.5 to -5.0**.
-2. **Damping (Oscillations):** To prevent "jittery" behavior and saturation, apply moderate negative feedback on angular velocities. `params[6]` and `params[7]` should likely be in the range of **-0.9 to -1.2**.
-3. **Centering (The Cart):** The cart needs to stay near the center, but fighting it too hard causes the poles to fall. Use **moderate negative feedback** on `params[0]` (Position) around **-0.4 to -0.6**, and `params[5]` (Velocity) around **-0.3 to -0.4**.
+1. **Primary Stability (The Second Pole):** The most critical factor is keeping the top pole upright. This typically requires **strong negative feedback** on `params[2]` (Sin(theta2)).
+2. **Damping (Oscillations):** To prevent "jittery" behavior and saturation, apply moderate negative feedback on angular velocities (`params[6]` and `params[7]`).
+3. **Centering (The Cart):** The cart needs to stay near the center, but fighting it too hard causes the poles to fall. Use **weak negative feedback** on `params[0]` (Position) and `params[5]` (Velocity).
 4. **Avoid Saturation:** If the action is frequently saturated (hitting -1 or 1), your gains are too high. Reduce the magnitude of your weights.
-5. **Noise Reduction:** The constraint force sensor (`params[8]`) often introduces noise. Set `params[8]` to **0.0** or keep it very small (< 0.5) to smooth the control signal.
+5. **Noise Reduction:** The constraint force sensor (`params[8]`) often introduces noise. Keep it very small to smooth the control signal.
 
 # Here's how we'll interact:
 1. I will first provide MAX_STEPS (400) along with a few training examples.
