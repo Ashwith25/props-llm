@@ -55,12 +55,7 @@ class LLMNumOptimRewardAgent:
             param_count = dim_action * dim_state + dim_action
         self.rank = param_count
 
-        if not self.bias:
-            self.policy = LinearPolicyNoBias(
-                dim_actions=dim_action, dim_states=dim_state
-            )
-        else:
-            self.policy = LinearPolicy(dim_actions=dim_action, dim_states=dim_state)
+        self.policy = LinearPolicy(dim_actions=dim_action, dim_states=dim_state)
         self.replay_buffer = EpisodeRewardBuffer(max_size=max_traj_count, max_best_values=max_best_length)
         self.traj_buffer = ReplayBuffer(max_traj_count, max_traj_length)
         self.llm_brain = LLMBrainReward(
@@ -172,20 +167,13 @@ class LLMNumOptimRewardAgent:
 
         # Update the policy using llm_brain, q_table and replay_buffer
         print("Updating the policy...")
-# return (
-#             validated_response.reward,
-#             validated_response.confidence,
-#             validated_response.reason,
-#             "system:\n"
-#             + system_prompt
-#             + "\n\n\nLLM:\n"
-#             + response
-#             + "\n\n\nThinking:\n"
-#             + thinking,
-#             api_time,
-#         )
 
-        params, pred_reward, confidence, reason, reasoning, api_time = self.llm_brain.llm_update_parameters_num_optim_semantics(
+        rand_weight = np.round((np.random.rand(self.dim_states, self.dim_actions) - 0.5) * 12, 1)
+        rand_bias = np.round((np.random.rand(1, self.dim_actions) - 0.5) * 12, 1)
+        params = np.concatenate((self.weight, self.bias), axis=0)
+
+        pred_reward, confidence, reason, reasoning, api_time = self.llm_brain.llm_update_parameters_num_optim_semantics(
+            params,
             str_nd_examples(self.replay_buffer, self.traj_buffer, self.rank),
             self.training_episodes,
             self.env_desc_file,
@@ -223,22 +211,22 @@ class LLMNumOptimRewardAgent:
         print(f"Results: {results}")
         result = np.mean(results)
 
-        # ! Uncomment the below code while implementing summary
-        # if self.summary:
-        #     RESP = self.stats.evaluate_params(new_parameter_list)
-        #     prompt = self.summary_template.render(
-        #         {
-        #             "env_description": self.env_desc_file,
-        #             "stats_definitions": self.summary_desc_file,
-        #             "trials_stats": json.dumps(RESP) 
-        #         }
-        #     )
-        #     # print("Prompt for summary:", prompt)
-        #     explanation=self.llm_brain.query_reasoning_llm(prompt)
-        #     self.replay_buffer.add(new_parameter_list, result, explanation)
-        # else:
-        self.replay_buffer.add(new_parameter_list, result)
-        # self.replay_buffer.sort()
+        
+        if self.summary:
+            RESP = self.stats.evaluate_params(params)
+            prompt = self.summary_template.render(
+                {
+                    "env_description": self.env_desc_file,
+                    "stats_definitions": self.summary_desc_file,
+                    "trials_stats": json.dumps(RESP) 
+                }
+            )
+            # print("Prompt for summary:", prompt)
+            explanation=self.llm_brain.query_reasoning_llm(prompt)
+            # ! Uncomment the below code while implementing summary
+            # self.replay_buffer.add(new_parameter_list, result, explanation)
+        else:
+            self.replay_buffer.add(params, result, pred_reward, confidence)
 
         self.training_episodes += 1
 

@@ -13,7 +13,7 @@ class LinearPolicy(Policy):
         self.weight = np.random.rand(self.dim_states, self.dim_actions)
 
     def initialize_policy(self):
-        self.weight = np.round((np.random.rand(self.dim_states, self.dim_actions) - 0.5) * 6, 1)
+        self.weight = np.round((np.random.rand(self.dim_states, self.dim_actions) - 0.5) * 12, 1)
 
     def get_action(self, state):
         state = state.T

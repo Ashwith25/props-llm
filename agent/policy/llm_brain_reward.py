@@ -539,6 +539,7 @@ class LLMBrainReward:
 
     def llm_update_parameters_num_optim_semantics(
         self,
+        parameters,
         episode_reward_buffer,
         step_number,
         env_desc_file,
@@ -548,7 +549,6 @@ class LLMBrainReward:
         actions=None,
     ):
         self.reset_llm_conversation()
-        params = None #TODO: add the random parameter generator function
 
         system_prompt = self.llm_si_template.render(
             {
@@ -560,7 +560,7 @@ class LLMBrainReward:
                 "step_size": str(search_step_size),
                 "actions": actions,
                 "response_schema": self.response_schema_json,
-                "input_parameter": params
+                "input_parameter": parameters
             }
         )
 
@@ -587,7 +587,6 @@ class LLMBrainReward:
         # explanation = self.query_reasoning_llm(new_parameters_lis, stats) if summary else None
 
         return (
-            params,
             validated_response.reward,
             validated_response.confidence,
             validated_response.reason,
