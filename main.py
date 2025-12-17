@@ -5,6 +5,7 @@ from runner import (
 )
 from runner import llm_num_optim_runner
 from runner import llm_num_optim_semantics_runner
+from runner import llm_num_reward_runner
 # import gym_maze
 # import gym_navigation
 from envs import nim, pong
@@ -87,6 +88,8 @@ def main():
         llm_num_optim_runner.run_training_loop(**config)
     elif config["task"] in ["dist_state_llm_num_optim_semantics", "cont_state_llm_num_optim_semantics"]:
         llm_num_optim_semantics_runner.run_training_loop(**config)
+    elif config["task"] in ["dist_state_llm_num_reward", "cont_state_llm_num_reward"]:
+        llm_num_reward_runner.run_training_loop(**config)
     else:
         raise ValueError(f"Task {config['task']} not recognized.")
 

@@ -1,0 +1,133 @@
+from world.continuous_space_general_world import ContinualSpaceGeneralWorld
+from world.discrete_state_general_world import DiscreteStateGeneralWorld
+from agent.llm_num_optim_q_table_semantics import LLMNumOptimQTableSemanticsAgent
+from agent.llm_num_optim_linear_policy_semantics import LLMNumOptimSemanticAgent
+from agent.llm_num_optim_reward import LLMNumOptimRewardAgent
+from jinja2 import Environment, FileSystemLoader
+import os
+import traceback
+import numpy as np
+
+from stats.base_statistics import BaseStatistics
+from stats.inverted_double_pendulum.idp_statistics import IDP_Statistics
+from stats.mountain_car_discrete.mcd_statistics import MC_Statistics
+from stats.inverted_pendulum.ip_statistics import IP_Statistics
+
+def run_training_loop(
+    task,
+    num_episodes,
+    gym_env_name,
+    render_mode,
+    logdir,
+    dim_actions,
+    dim_states,
+    max_traj_count,
+    max_traj_length,
+    max_best_length,
+    template_dir,
+    llm_si_template_name,
+    llm_output_conversion_template_name,
+    llm_model_name,
+    num_evaluation_episodes,
+    warmup_episodes,
+    warmup_dir,
+    summary,
+    memory_strategy,
+    summary_template = None,
+    summary_desc_file = None,
+    bias=None,
+    rank=None,
+    optimum=1000,
+    search_step_size=0.1,
+    env_kwargs=None,
+    env_desc_file=None,
+):
+    assert task in ["cont_state_llm_num_reward"], "Task name not found"
+
+    stats : BaseStatistics = None
+
+    if gym_env_name == "InvertedDoublePendulum-v5":
+        stats = IDP_Statistics()
+    elif gym_env_name == "MountainCar-v0":
+        stats = MC_Statistics()
+    elif gym_env_name == "InvertedPendulum-v5":
+        stats = IP_Statistics()
+
+    jinja2_env = Environment(loader=FileSystemLoader(template_dir))
+    llm_si_template = jinja2_env.get_template(llm_si_template_name)
+    llm_output_conversion_template = jinja2_env.get_template(
+        llm_output_conversion_template_name
+    )
+    llm_summary_template = None
+    if summary:
+        assert summary_template is not None, "Summary template must be provided if summary is True"
+        llm_summary_template = jinja2_env.get_template(summary_template)
+
+    # TODO: Expand to more tasks ffor rewards
+    if task == "cont_state_llm_num_reward":
+        world = ContinualSpaceGeneralWorld(
+            gym_env_name,
+            render_mode,
+            max_traj_length,
+        )
+
+        agent = LLMNumOptimRewardAgent(
+            logdir,
+            dim_actions,
+            dim_states,
+            max_traj_count,
+            max_traj_length,
+            max_best_length,
+            memory_strategy,
+            summary,
+            llm_summary_template,
+            summary_desc_file,
+            stats,
+            llm_si_template,
+            llm_output_conversion_template,
+            llm_model_name,
+            num_evaluation_episodes,
+            bias,
+            optimum,
+            search_step_size,
+            env_desc_file=env_desc_file,
+        )
+
+    print('init done')
+    print(os.environ.get('OLLAMA_HOST'))
+    print(os.environ)
+
+    if not warmup_dir:
+        warmup_dir = f"{logdir}/warmup"
+        os.makedirs(warmup_dir, exist_ok=True)
+        agent.random_warmup(world, warmup_dir, warmup_episodes)
+    else:
+        agent.replay_buffer.load(warmup_dir)
+    
+    overall_log_file = open(f"{logdir}/overall_log.txt", "w")
+    overall_log_file.write("Iteration, CPU Time, API Time, Total Episodes, Total Steps, Predicted Reward, True Reward, Confidence\n")
+    overall_log_file.flush()
+    for episode in range(num_episodes):
+        print(f"Episode: {episode}")
+        # create log dir
+        curr_episode_dir = f"{logdir}/episode_{episode}"
+        print(f"Creating log directory: {curr_episode_dir}")
+        os.makedirs(curr_episode_dir, exist_ok=True)
+        
+        for trial_idx in range(5):
+            try:
+                cpu_time, api_time, total_episodes, total_steps, predicted_reward, true_reward, confidence = agent.train_policy(world, curr_episode_dir)
+                overall_log_file.write(f"{episode + 1}, {cpu_time}, {api_time}, {total_episodes}, {total_steps}, {predicted_reward}, {true_reward}, {confidence}\n")
+                overall_log_file.flush()
+                print(f"{trial_idx + 1}th trial attempt succeeded in training")
+                break
+            except Exception as e:
+                print(
+                    f"{trial_idx + 1}th trial attempt failed with error in training: {e}"
+                )
+                traceback.print_exc()
+                continue
+        if trial_idx == 4:
+            print(f"Episode {episode} failed to train after 5 attempts")
+            break
+    overall_log_file.close()
