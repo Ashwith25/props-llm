@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=propsR
-#SBATCH --array=1-5                # Total number of sub-jobs (will be overridden by command line)
+#SBATCH --array=1-15                # Total number of sub-jobs (will be overridden by command line)
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2           # Default cores per sub-job (can be overridden with -c)
@@ -11,15 +11,37 @@
 #SBATCH --time=24:00:00             # Wall time for each sub-job
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=%u@asu.edu
-#SBATCH --output=propsR-slurm/task_%a.log
-#SBATCH --error=propsR-slurm/task_%a.err
+#SBATCH --output=propsR/task_%a.log
+#SBATCH --error=propsR/task_%a.err
 
-# --- Job Configuration ---
-CONFIG_FILE="configs/invertedpendulum/invertedpendulum_propsr.yaml"
-BASE_LOG_DIR="propsr-log/IP_propsR"
+# --- 1. Setup: Read Manifest ---
+manifest="${1:?ERROR -- must pass a manifest file as first argument}"
+taskid=$SLURM_ARRAY_TASK_ID
 
-# --- Create a unique directory for this specific trial's output ---
-TRIAL_LOG_DIR="${BASE_LOG_DIR}/trial_${SLURM_ARRAY_TASK_ID}"
+if [ ! -f "$manifest" ]; then
+    echo "ERROR: Manifest file not found: $manifest"
+    exit 1
+fi
+
+# Read the task ID line from manifest
+# Format: <random_seed> <scaler> <model>
+line=$(sed -n "${taskid}p" "$manifest")
+
+if [ -z "$line" ]; then
+    echo "ERROR: Task ID $taskid not found in manifest (manifest has $(wc -l < "$manifest") lines)"
+    exit 1
+fi
+
+# Extract parameters from the line
+random_seed=$(echo "$line" | cut -d ' ' -f 1)
+config=$(echo "$line" | cut -d ' ' -f 2)
+logdir=$(echo "$line" | cut -d ' ' -f 3)
+summary=$(echo "$line" | cut -d ' ' -f 4)
+max_traj_count=$(echo "$line" | cut -d ' ' -f 5)
+max_best_length=$(echo "$line" | cut -d ' ' -f 6)
+
+# --- Create output directory structure (like Python script does) ---
+TRIAL_LOG_DIR="${logdir}/trial_${random_seed}"
 mkdir -p "$TRIAL_LOG_DIR"
 
 # --- Load Modules ---
@@ -60,9 +82,24 @@ ollama list
 # --- Activate Mamba/Conda Environment ---
 source activate thesis
 
+echo "========================================================================="
+echo "SLURM Job Array Task: $taskid / $SLURM_ARRAY_JOB_ID"
+echo "Parameters from manifest:"
+echo "  Random Seed: $random_seed"
+echo "  Config: $config"
+echo "  Log Directory: $logdir"
+echo "  Summary Flag: $summary"
+echo "  Max Trajectory Count: $max_traj_count"
+echo "  Max Best Length: $max_best_length"
+echo "========================================================================="
+
+
 /home/apoojar4/.conda/envs/thesis/bin/python3 main.py \
-    --config "$CONFIG_FILE" \
-    --logdir "$TRIAL_LOG_DIR"
+    --config "$config" \
+    --logdir "$TRIAL_LOG_DIR" \
+    --summary "$summary" \
+    max_traj_count="$max_traj_count" \
+    max_best_length="$max_best_length"
 
 # Check exit status
 EXIT_STATUS=$?

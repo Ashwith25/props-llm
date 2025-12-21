@@ -9,6 +9,7 @@ import numpy as np
 import re
 import time
 import json
+import random
 from stats.base_statistics import BaseStatistics
 
 class LLMNumOptimRewardAgent:
@@ -48,6 +49,10 @@ class LLMNumOptimRewardAgent:
         self.summary_template = summary_template
         self.summary_desc_file = summary_desc_file
         self.stats=stats
+        with open("ip-params-sampled.txt", "r") as f:
+            self.ip_params = [np.array(l.split(" | ")[0].split(",")).astype(float) for l in f.readlines()]
+        
+        random.shuffle(self.ip_params)
 
         if not self.bias:
             param_count = dim_action * dim_state
@@ -56,7 +61,7 @@ class LLMNumOptimRewardAgent:
         self.rank = param_count
 
         self.policy = LinearPolicy(dim_actions=dim_action, dim_states=dim_state)
-        self.replay_buffer = EpisodeRewardBuffer(max_size=max_traj_count, max_best_values=max_best_length)
+        self.replay_buffer = EpisodeRewardBuffer(max_size=max_traj_count)
         self.traj_buffer = ReplayBuffer(max_traj_count, max_traj_length)
         self.llm_brain = LLMBrainReward(
             llm_si_template, llm_output_conversion_template, llm_model_name
@@ -105,7 +110,12 @@ class LLMNumOptimRewardAgent:
 
     def random_warmup(self, world: BaseWorld, logdir, num_episodes):
         for episode in range(num_episodes):
-            self.policy.initialize_policy()
+            # self.policy.initialize_policy()
+            # ! epsilon-decay kinda initialization
+            if episode < 10:
+                self.policy.initialize_policy()
+            else:
+                self.policy.update_policy(self.ip_params[self.training_episodes % len(self.ip_params)])
             # Run the episode and collect the trajectory
             print(f"Rolling out warmup episode {episode}...")
             logging_filename = f"{logdir}/warmup_rollout_{episode}.txt"
@@ -156,7 +166,7 @@ class LLMNumOptimRewardAgent:
                 l = ""
                 for i in range(n):
                     l += f"params[{i}]: {parameters[i]:.5g}; "
-                l += f"f(params): {true_reward:.2f}\n"
+                l += f"true_reward(params): {true_reward:.2f}\n"
                 l += f"predicted_reward(params): {pred_reward:.2f}\n" if pred_reward else f"predicted_reward(params): N/A\n"
                 #! uncomment for summary
                 # if explanation:
@@ -167,12 +177,25 @@ class LLMNumOptimRewardAgent:
 
         # Update the policy using llm_brain, q_table and replay_buffer
         print("Updating the policy...")
+        print("Current Policy Parameters:")
+        print(self.dim_state, self.dim_action)
 
-        rand_weight = np.round((np.random.rand(self.dim_states, self.dim_actions) - 0.5) * 12, 1)
-        rand_bias = np.round((np.random.rand(1, self.dim_actions) - 0.5) * 12, 1)
-        params = np.concatenate((self.weight, self.bias), axis=0)
+        # rand_weight = np.round((np.random.rand(self.dim_state, self.dim_action) - 0.5) * 12, 1)
+        # rand_bias = np.round((np.random.rand(1, self.dim_action) - 0.5) * 12, 1)
+        # params = np.concatenate((rand_weight, rand_bias), axis=0)
+
+        # self.policy.initialize_policy()
+        # params = np.array(self.policy.get_parameters()).reshape(-1)
+
+        params = self.ip_params[self.training_episodes % len(self.ip_params)]
+        print("Params before LLM call:", params, "Params shape:", params.shape)
+
+        _, prev_true, prev_predicted, prev_confidence = self.replay_buffer.buffer[-1]
 
         pred_reward, confidence, reason, reasoning, api_time = self.llm_brain.llm_update_parameters_num_optim_semantics(
+            prev_true,
+            prev_predicted,
+            prev_confidence,
             params,
             str_nd_examples(self.replay_buffer, self.traj_buffer, self.rank),
             self.training_episodes,

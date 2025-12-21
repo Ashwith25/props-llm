@@ -2,7 +2,7 @@ task: cont_state_llm_num_reward
 num_episodes: 400
 gym_env_name: InvertedPendulum-v5
 render_mode: null
-logdir: logs/IP_propsp_baseline
+logdir: reward-logs/propsr-params-dataset/invertedpendulum
 dim_actions: 1
 dim_states: 4
 max_traj_count: 70

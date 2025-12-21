@@ -166,379 +166,11 @@ class LLMBrainReward:
 
             return response, thinking
 
-    def query_llm_multiple_response(self, num_responses, temperature):
-        for attempt in range(5):
-            try:
-                if self.model_group == "openai":
-                    completion = self.client.chat.completions.create(
-                        model=self.llm_model_name,
-                        messages=self.llm_conversation,
-                        n=num_responses,
-                        temperature=temperature,
-                    )
-                    responses = [
-                        completion.choices[i].message.content
-                        for i in range(num_responses)
-                    ]
-                else:
-                    model = genai.GenerativeModel(model_name=self.llm_model_name)
-                    responses = model.generate_content(
-                        contents=self.llm_conversation,
-                        generation_config=genai.GenerationConfig(
-                            candidate_count=num_responses,
-                            temperature=temperature,
-                        ),
-                    )
-                    responses = [
-                        "\n".join([x.text for x in c.content.parts])
-                        for c in responses.candidates
-                    ]
-
-            except Exception as e:
-                print(f"Error: {e}")
-                print("Retrying...")
-                if attempt == 4:
-                    raise Exception("Failed")
-                else:
-                    print("Waiting for 60 seconds before retrying...")
-                    time.sleep(60)
-
-            return responses
-
-    def parse_parameters(self, parameters_string):
-        new_parameters_list = []
-
-        # Update the Q-table based on the new Q-table
-        for row in parameters_string.split("\n"):
-            if row.strip().strip(","):
-                try:
-                    parameters_row = [
-                        float(x.strip().strip(",")) for x in row.split(",")
-                    ]
-                    new_parameters_list.append(parameters_row)
-                except Exception as e:
-                    print(e)
-
-        return new_parameters_list
-
-    def llm_update_parameters(self, parameters, replay_buffer, parse_parameters=None):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "replay_buffer_string": str(replay_buffer),
-                "parameters_string": str(parameters),
-            }
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning = self.query_llm()
-
-        if self.model_group == "openai":
-            self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        else:
-            self.add_llm_conversation(new_parameters_with_reasoning, "model")
-        self.add_llm_conversation(
-            self.llm_output_conversion_template.render(),
-            "user",
-        )
-        new_parameters = self.query_llm()
-
-        if parse_parameters is None:
-            new_parameters_list = self.parse_parameters(new_parameters)
-        else:
-            new_parameters_list = parse_parameters(new_parameters)
-
-        return new_parameters_list, [new_parameters_with_reasoning, new_parameters]
-
-    def llm_update_parameters_sas(self, episode_reward_buffer, parse_parameters=None):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {"episode_reward_buffer_string": str(episode_reward_buffer)}
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning = self.query_llm()
-
-        print(system_prompt)
-
-        self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        self.add_llm_conversation(
-            self.llm_output_conversion_template.render(),
-            "user",
-        )
-        new_parameters = self.query_llm()
-
-        if parse_parameters is None:
-            new_parameters_list = self.parse_parameters(new_parameters)
-        else:
-            new_parameters_list = parse_parameters(new_parameters)
-
-        return new_parameters_list, [
-            "system:\n"
-            + system_prompt
-            + "\n\n\nLLM:\n"
-            + new_parameters_with_reasoning,
-            new_parameters,
-        ]
-
-    def llm_update_parameters_num_optim(
-        self,
-        episode_reward_buffer,
-        parse_parameters,
-        step_number,
-        rank=None,
-        optimum=None,
-        search_step_size=0.1,
-        actions=None,
-    ):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "episode_reward_buffer_string": str(episode_reward_buffer),
-                "step_number": str(step_number),
-                "rank": rank,
-                "optimum": str(optimum),
-                "step_size": str(search_step_size),
-                "actions": actions,
-            }
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-
-        api_start_time = time.time()
-        new_parameters_with_reasoning = self.query_llm()
-        api_time = time.time() - api_start_time
-
-        # print(system_prompt)
-
-        # self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        # self.add_llm_conversation(
-        #     self.llm_output_conversion_template.render(),
-        #     "user",
-        # )
-        # new_parameters = self.query_llm()
-        new_parameters_list = parse_parameters(new_parameters_with_reasoning)
-
-        return (
-            new_parameters_list,
-            "system:\n"
-            + system_prompt
-            + "\n\n\nLLM:\n"
-            + new_parameters_with_reasoning,
-            api_time,
-        )
-
-    def llm_update_parameters_num_optim_q_table(
-        self,
-        episode_reward_buffer,
-        parse_parameters,
-        step_number,
-        actions,
-        num_states,
-        optimum,
-    ):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "episode_reward_buffer_string": str(episode_reward_buffer),
-                "step_number": str(step_number),
-                "actions": actions,
-                "rank": num_states,
-                "optimum": str(optimum),
-            }
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning = self.query_llm()
-
-        print(system_prompt)
-
-        # self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        # self.add_llm_conversation(
-        #     self.llm_output_conversion_template.render(),
-        #     "user",
-        # )
-        # new_parameters = self.query_llm()
-        new_parameters_list = parse_parameters(new_parameters_with_reasoning)
-
-        return (
-            new_parameters_list,
-            "system:\n"
-            + system_prompt
-            + "\n\n\nLLM:\n"
-            + new_parameters_with_reasoning,
-        )
-
-    def llm_update_parameters_num_optim_imitation(
-        self,
-        demonstrations_str,
-        episode_reward_buffer,
-        parse_parameters,
-        step_number,
-        search_std,
-    ):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "expert_demonstration_string": demonstrations_str,
-                "episode_reward_buffer_string": str(episode_reward_buffer),
-                "step_number": str(step_number),
-                "search_std": str(search_std),
-            }
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning = self.query_llm()
-
-        print(system_prompt)
-
-        # self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        # self.add_llm_conversation(
-        #     self.llm_output_conversion_template.render(),
-        #     "user",
-        # )
-        # new_parameters = self.query_llm()
-        new_parameters_list = parse_parameters(new_parameters_with_reasoning)
-
-        return (
-            new_parameters_list,
-            "system:\n"
-            + system_prompt
-            + "\n\n\nLLM:\n"
-            + new_parameters_with_reasoning,
-        )
-
-    def llm_propose_parameters_num_optim_based_on_anchor(
-        self,
-        episode_reward_buffer,
-        parse_parameters,
-        step_number,
-        search_std,
-        anchor_parameters,
-    ):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "episode_reward_buffer_string": str(episode_reward_buffer),
-                "step_number": str(step_number),
-                "search_std": str(search_std),
-                "anchor_parameters": str(anchor_parameters),
-            }
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning = self.query_llm()
-
-        print(system_prompt)
-
-        # self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        # self.add_llm_conversation(
-        #     self.llm_output_conversion_template.render(),
-        #     "user",
-        # )
-        # new_parameters = self.query_llm()
-        new_parameters_list = parse_parameters(new_parameters_with_reasoning)
-
-        return (
-            new_parameters_list,
-            "system:\n"
-            + system_prompt
-            + "\n\n\nLLM:\n"
-            + new_parameters_with_reasoning,
-        )
-
-    def llm_propose_multiple_parameters_num_optim_based_on_anchor(
-        self,
-        episode_reward_buffer,
-        parse_parameters,
-        step_number,
-        search_std,
-        anchor_parameters,
-        num_candidates,
-        temperature,
-    ):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "episode_reward_buffer_string": str(episode_reward_buffer),
-                "step_number": str(step_number),
-                "search_std": str(search_std),
-                "anchor_parameters": str(anchor_parameters),
-            }
-        )
-
-        # print(system_prompt)
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning_list = self.query_llm_multiple_response(
-            num_candidates, temperature
-        )
-        # print(new_parameters_with_reasoning_list)
-
-        new_parameters_list = []
-        reasonings_list = []
-        for new_params in new_parameters_with_reasoning_list:
-            new_params_np = parse_parameters(new_params)
-            new_parameters_list.append(new_params_np)
-            reasonings_list.append(new_params)
-
-        return (
-            system_prompt,
-            new_parameters_list,
-            reasonings_list,
-        )
-
-    def llm_propose_parameters_num_optim_based_on_anchor_thread(
-        self,
-        new_candidates,
-        new_idx,
-        episode_reward_buffer,
-        parse_parameters,
-        step_number,
-        search_std,
-        anchor_parameters,
-    ):
-        self.reset_llm_conversation()
-
-        system_prompt = self.llm_si_template.render(
-            {
-                "episode_reward_buffer_string": str(episode_reward_buffer),
-                "step_number": str(step_number),
-                "search_std": str(search_std),
-                "anchor_parameters": str(anchor_parameters),
-            }
-        )
-
-        self.add_llm_conversation(system_prompt, "user")
-        new_parameters_with_reasoning = self.query_llm()
-
-        print(system_prompt)
-
-        # self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
-        # self.add_llm_conversation(
-        #     self.llm_output_conversion_template.render(),
-        #     "user",
-        # )
-        # new_parameters = self.query_llm()
-        new_parameters_list = parse_parameters(new_parameters_with_reasoning)
-        new_candidates[new_idx] = new_parameters_list
-
-        return (
-            new_parameters_list,
-            "system:\n"
-            + system_prompt
-            + "\n\n\nLLM:\n"
-            + new_parameters_with_reasoning,
-        )
-
     def llm_update_parameters_num_optim_semantics(
         self,
+        prev_true_reward,
+        prev_predicted_reward,
+        prev_confidence,
         parameters,
         episode_reward_buffer,
         step_number,
@@ -548,30 +180,39 @@ class LLMBrainReward:
         search_step_size=0.1,
         actions=None,
     ):
-        self.reset_llm_conversation()
+        # self.reset_llm_conversation()
 
         system_prompt = self.llm_si_template.render(
             {
                 "episode_reward_buffer_string": str(episode_reward_buffer),
                 "env_description": env_desc_file,
-                "step_number": str(step_number),
                 "rank": rank,
                 "optimum": str(optimum),
                 "step_size": str(search_step_size),
                 "actions": actions,
                 "response_schema": self.response_schema_json,
-                "input_parameter": parameters
             }
         )
 
+        followup_prompt_prev_result = f"The previous params yielded {prev_true_reward} whereas your prediction was {prev_predicted_reward} with confidence {prev_confidence}.\n"
+        followup_prompt = f"Now you are at iteration {step_number} out of 400. Find the reward for the following parameters:\n\
+{parameters}"
 
-        self.add_llm_conversation(system_prompt, "user")
+        if len(self.llm_conversation) == 0:
+            self.add_llm_conversation(system_prompt, "system")
+            self.add_llm_conversation(followup_prompt, "user")
+        else:
+            self.add_llm_conversation(followup_prompt_prev_result + followup_prompt, "user")
 
         api_start_time = time.time()
         response, thinking = self.query_llm()
         api_time = time.time() - api_start_time
-
-        validated_response = OutputSchema.model_validate_json(response)
+        try:
+            validated_response = OutputSchema.model_validate_json(response)
+        except ValidationError as e:
+            print("INCORRECT Response from LLM:", response)
+            print("Validation error:", e)
+            raise e
 
         # print(system_prompt)
 
@@ -591,7 +232,7 @@ class LLMBrainReward:
             validated_response.confidence,
             validated_response.reason,
             "system:\n"
-            + system_prompt
+            + (system_prompt + followup_prompt) if step_number == 0 else (followup_prompt_prev_result + followup_prompt)
             + "\n\n\nLLM:\n"
             + response
             + "\n\n\nThinking:\n"

@@ -1,4 +1,4 @@
-You are a good global optimizer, helping me estimate the reward of a given parameter in the following environment:
+You are a good reward estimator, helping me estimate the reward of a given parameter in the following environment:
 
 # Environment:
 {% include env_description %}
@@ -25,10 +25,9 @@ Next, you will see examples of params and the true reward.
 {{ episode_reward_buffer_string }}
 
 params represent a linear policy.
-f(params) is the true episodic reward of the policy.
+true_reward(params) is the true episodic reward of the policy.
 predicted_reward(params) is your estimated reward of the policy.
 
-Now you are at iteration {{step_number}} out of 400. Find the reward for the following parameters:
-{{ input_parameter }}
+Additionally, keep track of the chat history to ensure we can continue the search from where we left off and check the past interactions to improve your estimates.
 
 Please provide the results in the indicated format. Do not provide any additional texts.
