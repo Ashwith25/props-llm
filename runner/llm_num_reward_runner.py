@@ -86,6 +86,7 @@ def run_training_loop(
             llm_si_template,
             llm_output_conversion_template,
             llm_model_name,
+            warmup_episodes,
             num_evaluation_episodes,
             bias,
             optimum,
@@ -105,7 +106,7 @@ def run_training_loop(
         agent.replay_buffer.load(warmup_dir)
     
     overall_log_file = open(f"{logdir}/overall_log.txt", "w")
-    overall_log_file.write("Iteration, CPU Time, API Time, Total Episodes, Total Steps, Predicted Reward, True Reward, Confidence\n")
+    overall_log_file.write("Iteration, Params, CPU Time, API Time, Total Episodes, Total Steps, True Reward, Predicted Reward, Confidence\n")
     overall_log_file.flush()
     for episode in range(num_episodes):
         print(f"Episode: {episode}")
@@ -116,8 +117,8 @@ def run_training_loop(
         
         for trial_idx in range(5):
             try:
-                cpu_time, api_time, total_episodes, total_steps, predicted_reward, true_reward, confidence = agent.train_policy(world, curr_episode_dir)
-                overall_log_file.write(f"{episode + 1}, {cpu_time}, {api_time}, {total_episodes}, {total_steps}, {predicted_reward}, {true_reward}, {confidence}\n")
+                params, cpu_time, api_time, total_episodes, total_steps, predicted_reward, true_reward, confidence = agent.train_policy(world, curr_episode_dir)
+                overall_log_file.write(f"{episode + 1}, {np.array2string(params)}, {cpu_time}, {api_time}, {total_episodes}, {total_steps}, {predicted_reward}, {true_reward}, {confidence}\n")
                 overall_log_file.flush()
                 print(f"{trial_idx + 1}th trial attempt succeeded in training")
                 break

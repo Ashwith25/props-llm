@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=propsR
-#SBATCH --array=1-5                # Total number of sub-jobs (will be overridden by command line)
+#SBATCH --array=1                # Total number of sub-jobs (will be overridden by command line)
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2           # Default cores per sub-job (can be overridden with -c)
@@ -11,12 +11,12 @@
 #SBATCH --time=24:00:00             # Wall time for each sub-job
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=%u@asu.edu
-#SBATCH --output=propsR-slurm/task_%a.log
-#SBATCH --error=propsR-slurm/task_%a.err
+#SBATCH --output=propsR-log/propsR-slurm/task_%a.log
+#SBATCH --error=propsR-log/propsR-slurm/task_%a.err
 
 # --- Job Configuration ---
 CONFIG_FILE="configs/invertedpendulum/invertedpendulum_propsr.yaml"
-BASE_LOG_DIR="propsr-log/IP_propsR"
+BASE_LOG_DIR="propsR-log/IP_propsR"
 
 # --- Create a unique directory for this specific trial's output ---
 TRIAL_LOG_DIR="${BASE_LOG_DIR}/trial_${SLURM_ARRAY_TASK_ID}"

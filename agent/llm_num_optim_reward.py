@@ -29,6 +29,7 @@ class LLMNumOptimRewardAgent:
         llm_si_template,
         llm_output_conversion_template,
         llm_model_name,
+        warmup_episodes,
         num_evaluation_episodes,
         bias,
         optimum,
@@ -53,6 +54,8 @@ class LLMNumOptimRewardAgent:
             self.ip_params = [np.array(l.split(" | ")[0].split(",")).astype(float) for l in f.readlines()]
         
         random.shuffle(self.ip_params)
+
+        self.warmup_samples = random.sample(self.ip_params, warmup_episodes)
 
         if not self.bias:
             param_count = dim_action * dim_state
@@ -111,11 +114,11 @@ class LLMNumOptimRewardAgent:
     def random_warmup(self, world: BaseWorld, logdir, num_episodes):
         for episode in range(num_episodes):
             # self.policy.initialize_policy()
-            # ! epsilon-decay kinda initialization
-            if episode < 10:
-                self.policy.initialize_policy()
-            else:
-                self.policy.update_policy(self.ip_params[self.training_episodes % len(self.ip_params)])
+            # TODO: epsilon-decay kinda initialization
+            # if episode < 10:
+            #     self.policy.initialize_policy()
+            # else:
+            self.policy.update_policy(self.warmup_samples[episode])
             # Run the episode and collect the trajectory
             print(f"Rolling out warmup episode {episode}...")
             logging_filename = f"{logdir}/warmup_rollout_{episode}.txt"
@@ -166,7 +169,7 @@ class LLMNumOptimRewardAgent:
                 l = ""
                 for i in range(n):
                     l += f"params[{i}]: {parameters[i]:.5g}; "
-                l += f"true_reward(params): {true_reward:.2f}\n"
+                l += f"true_reward(params): {true_reward:.2f}; "
                 l += f"predicted_reward(params): {pred_reward:.2f}\n" if pred_reward else f"predicted_reward(params): N/A\n"
                 #! uncomment for summary
                 # if explanation:
@@ -258,7 +261,7 @@ class LLMNumOptimRewardAgent:
         _total_episodes = self.total_episodes
         _total_steps = self.total_steps
         _total_reward = result
-        return _cpu_time, _api_time, _total_episodes, _total_steps, _total_reward, pred_reward, confidence
+        return params, _cpu_time, _api_time, _total_episodes, _total_steps, _total_reward, pred_reward, confidence
     
 
     def evaluate_policy(self, world: BaseWorld, logdir):

@@ -1,6 +1,8 @@
+.vscode/
 plots
 *log*
 */*/__pycache__/
 */__pycache__/
 /__pycache__/
 ablation*
+*.txt

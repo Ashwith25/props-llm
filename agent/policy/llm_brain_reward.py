@@ -134,6 +134,7 @@ class LLMBrainReward:
                     )
                     response = completion.choices[0].message.content
                     thinking = completion.choices[0].message.to_dict().get("reasoning", "")
+                    self.add_llm_conversation(response, "assistant")
 
                 elif self.model_group == "anthropic":
                     message = self.client.messages.create(
