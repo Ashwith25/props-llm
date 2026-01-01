@@ -88,6 +88,45 @@ class EpisodeRewardBuffer:
             buffer_table += f"{params} | {true_reward} | {pred_reward} | {confidence}\n"
         return buffer_table
 
+    def getTopKItems(self, params, k=10):
+        if len(self.buffer) == 0:
+            return []
+
+        # Vectorized implementation for better performance
+        buffer_list = list(self.buffer)
+        # Extract parameters and flatten them
+        buffer_params = np.array([np.array(item[0]).flatten() for item in buffer_list])
+        
+        # Remove duplicates based on parameters
+        _, unique_indices = np.unique(buffer_params, axis=0, return_index=True)
+        unique_buffer_params = buffer_params[unique_indices]
+        unique_buffer_list = [buffer_list[i] for i in unique_indices]
+
+        query_params = np.array(params).flatten()
+        
+        query_norm = np.linalg.norm(query_params)
+        buffer_norms = np.linalg.norm(unique_buffer_params, axis=1)
+        
+        # Compute cosine similarity
+        dot_products = unique_buffer_params @ query_params
+        denominator = buffer_norms * query_norm
+        
+        with np.errstate(divide='ignore', invalid='ignore'):
+            similarities = dot_products / denominator
+        
+        similarities = np.nan_to_num(similarities, nan=0.0)
+        
+        k = min(k, len(similarities))
+        if k == len(similarities):
+            top_indices = np.argsort(similarities)[::-1]
+        else:
+            # Use argpartition for O(n) selection of top k
+            top_indices = np.argpartition(similarities, -k)[-k:]
+            # Sort the top k indices
+            top_indices = top_indices[np.argsort(similarities[top_indices])[::-1]]
+            
+        return [unique_buffer_list[i] for i in top_indices]
+
     def load(self, folder):
         # Find all episode files
         # all_files = [os.path.join(folder, x) for x in os.listdir(folder) if x.startswith('warmup_rollout')]

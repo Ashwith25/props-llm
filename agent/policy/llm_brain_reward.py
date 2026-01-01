@@ -169,6 +169,7 @@ class LLMBrainReward:
 
     def llm_update_parameters_num_optim_semantics(
         self,
+        prev_params,
         prev_true_reward,
         prev_predicted_reward,
         prev_confidence,
@@ -195,9 +196,8 @@ class LLMBrainReward:
             }
         )
 
-        followup_prompt_prev_result = f"The previous params yielded {prev_true_reward} whereas your prediction was {prev_predicted_reward} with confidence {prev_confidence}.\n"
-        followup_prompt = f"Now you are at iteration {step_number} out of 400. Find the reward for the following parameters:\n\
-{parameters}"
+        followup_prompt_prev_result = f"The previous param {prev_params} yielded {prev_true_reward} whereas your prediction was {prev_predicted_reward} with confidence {prev_confidence}.\n"
+        followup_prompt = f"Now you are at iteration {step_number} out of 400. Find the reward for the following new set of parameters:\n{parameters}"
 
         if len(self.llm_conversation) == 0:
             self.add_llm_conversation(system_prompt, "system")

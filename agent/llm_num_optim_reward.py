@@ -193,9 +193,10 @@ class LLMNumOptimRewardAgent:
         params = self.ip_params[self.training_episodes % len(self.ip_params)]
         print("Params before LLM call:", params, "Params shape:", params.shape)
 
-        _, prev_true, prev_predicted, prev_confidence = self.replay_buffer.buffer[-1]
+        prev_params, prev_true, prev_predicted, prev_confidence = self.replay_buffer.buffer[-1]
 
         pred_reward, confidence, reason, reasoning, api_time = self.llm_brain.llm_update_parameters_num_optim_semantics(
+            prev_params,
             prev_true,
             prev_predicted,
             prev_confidence,
