@@ -13,7 +13,7 @@ from stats.inverted_double_pendulum.idp_stats import evaluate_params
 import json
 from configs.inverted_double_pendulum.idp_summarise_template import TEMPLATE
 
-from ollama_config import ollama_base_url
+# from ollama_config import ollama_base_url
 # from ollama import chat
 
 class LLMBrain:

@@ -3,7 +3,7 @@ You are a good reward estimator, helping me estimate the reward of a given param
 # Environment:
 {% include env_description %}
 
-**The reward can be in the range of [0, 1000]**
+**The reward can be in the range of {{ reward_range }}**
 
 # Regarding the parameters **params**:
 **params** is an array of {{ rank }} float numbers.
@@ -17,9 +17,7 @@ You are a good reward estimator, helping me estimate the reward of a given param
 3. I will then provide the actual reward for those parameters, and the current iteration.
 4. We will repeat steps 2-3 until we reach the maximum number of iterations.
 
-# Remember:
-1. Search both positive and negative values. **During exploration, use search step size of {{ step_size }}**.
-2. The environment is noisy. The true reward may vary slightly even for the same parameters.
+# Remember: The environment is noisy. The true reward may vary slightly even for the same parameters.
 
 Next, you will see examples of params and the true reward.
 {{ episode_reward_buffer_string }}
@@ -28,6 +26,7 @@ params represent a linear policy.
 true_reward(params) is the true episodic reward of the policy.
 predicted_reward(params) is your estimated reward of the policy.
 
-Additionally, you must keep track of the chat history all the time to ensure we can continue the search from where we left off and check the past interactions to improve your estimates.
+Now, please provide your estimated reward for the following params:
+{{ target_params_string }}
 
-Please provide the results in the indicated format. Do not provide any additional texts.
+Now you are at iteration {{ current_iteration }}. Please provide the results in the indicated format. Do not provide any additional texts.

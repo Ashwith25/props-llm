@@ -13,7 +13,7 @@ from stats.inverted_double_pendulum.idp_stats import evaluate_params
 import json
 from configs.inverted_double_pendulum.idp_summarise_template import TEMPLATE
 from pydantic import BaseModel, Field, ValidationError
-from ollama_config import ollama_base_url
+# from ollama_config import ollama_base_url
 # from ollama import chat
 
 class OutputSchema(BaseModel):
@@ -129,8 +129,7 @@ class LLMBrainReward:
                 if self.model_group == "openai":
                     completion = self.client.chat.completions.create(
                         model=self.llm_model_name,
-                        messages=self.llm_conversation,
-                        extra_body={"reasoning_effort": "high"},
+                        messages=self.llm_conversation
                     )
                     response = completion.choices[0].message.content
                     thinking = completion.choices[0].message.to_dict().get("reasoning", "")
@@ -169,20 +168,17 @@ class LLMBrainReward:
 
     def llm_update_parameters_num_optim_semantics(
         self,
-        prev_params,
-        prev_true_reward,
-        prev_predicted_reward,
-        prev_confidence,
-        parameters,
+        params: np.ndarray,
         episode_reward_buffer,
         step_number,
         env_desc_file,
+        reward_range=None,
         rank=None,
         optimum=None,
         search_step_size=0.1,
         actions=None,
     ):
-        # self.reset_llm_conversation()
+        self.reset_llm_conversation()
 
         system_prompt = self.llm_si_template.render(
             {
@@ -192,18 +188,14 @@ class LLMBrainReward:
                 "optimum": str(optimum),
                 "step_size": str(search_step_size),
                 "actions": actions,
+                "current_iteration": step_number,
                 "response_schema": self.response_schema_json,
+                "target_params_string": np.array2string(params, separator=', '),
+                "reward_range": reward_range,
             }
         )
 
-        followup_prompt_prev_result = f"The previous param {prev_params} yielded {prev_true_reward} whereas your prediction was {prev_predicted_reward} with confidence {prev_confidence}.\n"
-        followup_prompt = f"Now you are at iteration {step_number} out of 400. Find the reward for the following new set of parameters:\n{parameters}"
-
-        if len(self.llm_conversation) == 0:
-            self.add_llm_conversation(system_prompt, "system")
-            self.add_llm_conversation(followup_prompt, "user")
-        else:
-            self.add_llm_conversation(followup_prompt_prev_result + followup_prompt, "user")
+        self.add_llm_conversation(system_prompt, "user")
 
         api_start_time = time.time()
         response, thinking = self.query_llm()
@@ -233,7 +225,7 @@ class LLMBrainReward:
             validated_response.confidence,
             validated_response.reason,
             "system:\n"
-            + (system_prompt + followup_prompt) if step_number == 0 else (followup_prompt_prev_result + followup_prompt)
+            + system_prompt
             + "\n\n\nLLM:\n"
             + response
             + "\n\n\nThinking:\n"

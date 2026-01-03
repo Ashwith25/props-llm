@@ -34,6 +34,8 @@ class LLMNumOptimRewardAgent:
         bias,
         optimum,
         search_step_size,
+        dataset_file=None,
+        reward_range=None,
         env_desc_file=None,
     ):
         self.start_time = time.process_time()
@@ -50,10 +52,12 @@ class LLMNumOptimRewardAgent:
         self.summary_template = summary_template
         self.summary_desc_file = summary_desc_file
         self.stats=stats
-        with open("ip-params-sampled.txt", "r") as f:
+        self.reward_range = reward_range
+        assert dataset_file is not None, "Dataset file for parameters must be provided."
+        with open(dataset_file, "r") as f:
             self.ip_params = [np.array(l.split(" | ")[0].split(",")).astype(float) for l in f.readlines()]
         
-        random.shuffle(self.ip_params)
+        # random.shuffle(self.ip_params)
 
         self.warmup_samples = random.sample(self.ip_params, warmup_episodes)
 
@@ -161,11 +165,11 @@ class LLMNumOptimRewardAgent:
 
     def train_policy(self, world: BaseWorld, logdir):
 
-        def str_nd_examples(replay_buffer, traj_buffer: ReplayBuffer, n):
+        def str_nd_examples(params, replay_buffer: EpisodeRewardBuffer, traj_buffer: ReplayBuffer, n):
             text = ""
             print('Num trajs in buffer:', len(traj_buffer.buffer))
             print('Num params in buffer:', len(replay_buffer.buffer))
-            for parameters, true_reward, pred_reward, _ in replay_buffer.buffer:
+            for parameters, true_reward, pred_reward, _ in replay_buffer.getTopKItems(params, 20):
                 l = ""
                 for i in range(n):
                     l += f"params[{i}]: {parameters[i]:.5g}; "
@@ -193,17 +197,12 @@ class LLMNumOptimRewardAgent:
         params = self.ip_params[self.training_episodes % len(self.ip_params)]
         print("Params before LLM call:", params, "Params shape:", params.shape)
 
-        prev_params, prev_true, prev_predicted, prev_confidence = self.replay_buffer.buffer[-1]
-
         pred_reward, confidence, reason, reasoning, api_time = self.llm_brain.llm_update_parameters_num_optim_semantics(
-            prev_params,
-            prev_true,
-            prev_predicted,
-            prev_confidence,
             params,
-            str_nd_examples(self.replay_buffer, self.traj_buffer, self.rank),
+            str_nd_examples(params, self.replay_buffer, self.traj_buffer, self.rank),
             self.training_episodes,
             self.env_desc_file,
+            self.reward_range,
             self.rank,
             self.optimum,
             self.search_step_size

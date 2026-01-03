@@ -3,6 +3,7 @@ from world.discrete_state_general_world import DiscreteStateGeneralWorld
 from agent.llm_num_optim_q_table_semantics import LLMNumOptimQTableSemanticsAgent
 from agent.llm_num_optim_linear_policy_semantics import LLMNumOptimSemanticAgent
 from agent.llm_num_optim_reward import LLMNumOptimRewardAgent
+from agent.nn_num_optim_reward import NNNumOptimRewardAgent
 from jinja2 import Environment, FileSystemLoader
 import os
 import traceback
@@ -40,7 +41,10 @@ def run_training_loop(
     optimum=1000,
     search_step_size=0.1,
     env_kwargs=None,
+    dataset_file=None,
+    reward_range=None,
     env_desc_file=None,
+    run_nn_train=False,
 ):
     assert task in ["cont_state_llm_num_reward"], "Task name not found"
 
@@ -63,7 +67,7 @@ def run_training_loop(
         assert summary_template is not None, "Summary template must be provided if summary is True"
         llm_summary_template = jinja2_env.get_template(summary_template)
 
-    # TODO: Expand to more tasks ffor rewards
+    # TODO: Expand to more tasks for rewards
     if task == "cont_state_llm_num_reward":
         world = ContinualSpaceGeneralWorld(
             gym_env_name,
@@ -71,28 +75,46 @@ def run_training_loop(
             max_traj_length,
         )
 
-        agent = LLMNumOptimRewardAgent(
-            logdir,
-            dim_actions,
-            dim_states,
-            max_traj_count,
-            max_traj_length,
-            max_best_length,
-            memory_strategy,
-            summary,
-            llm_summary_template,
-            summary_desc_file,
-            stats,
-            llm_si_template,
-            llm_output_conversion_template,
-            llm_model_name,
-            warmup_episodes,
-            num_evaluation_episodes,
-            bias,
-            optimum,
-            search_step_size,
-            env_desc_file=env_desc_file,
-        )
+        if run_nn_train:
+            agent = NNNumOptimRewardAgent(
+                logdir,
+                dim_actions,
+                dim_states,
+                max_traj_count,
+                llm_si_template,
+                llm_model_name,
+                warmup_episodes,
+                num_evaluation_episodes,
+                bias,
+                optimum,
+                dataset_file=dataset_file,
+                env_desc_file=env_desc_file,
+            )
+        else:
+            agent = LLMNumOptimRewardAgent(
+                logdir,
+                dim_actions,
+                dim_states,
+                max_traj_count,
+                max_traj_length,
+                max_best_length,
+                memory_strategy,
+                summary,
+                llm_summary_template,
+                summary_desc_file,
+                stats,
+                llm_si_template,
+                llm_output_conversion_template,
+                llm_model_name,
+                warmup_episodes,
+                num_evaluation_episodes,
+                bias,
+                optimum,
+                search_step_size,
+                dataset_file,
+                reward_range,
+                env_desc_file=env_desc_file,
+            )
 
     print('init done')
     print(os.environ.get('OLLAMA_HOST'))
