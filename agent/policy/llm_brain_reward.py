@@ -13,13 +13,26 @@ from stats.inverted_double_pendulum.idp_stats import evaluate_params
 import json
 from configs.inverted_double_pendulum.idp_summarise_template import TEMPLATE
 from pydantic import BaseModel, Field, ValidationError
+from typing import Tuple, Any, List, Optional, Dict
+from enum import Enum
 # from ollama_config import ollama_base_url
 # from ollama import chat
+
+class Operation(str, Enum):
+    CREATE = "create"
+    MODIFY = "modify"
+    DELETE = "delete"
+
+class Insight(BaseModel):
+    operation: Operation = Field(description="Operation to be performed on the insight: create, modify, or delete.")
+    insightId: Optional[int] = Field(default=None, description="Unique identifier for the insight to be modified/deleted. DO NOT provide this field when creating a new insight.")
+    description: str = Field(description="Well-explained description of the insight. Leave this field empty when deleting an insight.")
 
 class OutputSchema(BaseModel):
     reward: float = Field(description="Value of the reward aiming to estimate the most approximate reward. Please propose reward with 2 decimal places.")
     confidence: int = Field(description="Confidence score between 1 to 10, indicating your confidence on the reward your suggested.")
     reason: str = Field(description="Detailed explanation of why you chose that reward.")
+    insight: Optional[Insight] = Field(default=None)
 
 class LLMBrainReward:
     def __init__(
@@ -33,6 +46,7 @@ class LLMBrainReward:
         self.llm_conversation = []
         response_schema_dict = OutputSchema.model_json_schema()
         self.response_schema_json = json.dumps(response_schema_dict, indent=2)
+        self.insights = []
 
         assert llm_model_name in [
             "o1-preview",
@@ -129,7 +143,8 @@ class LLMBrainReward:
                 if self.model_group == "openai":
                     completion = self.client.chat.completions.create(
                         model=self.llm_model_name,
-                        messages=self.llm_conversation
+                        messages=self.llm_conversation,
+                        extra_body={"reasoning_effort": "high"},
                     )
                     response = completion.choices[0].message.content
                     thinking = completion.choices[0].message.to_dict().get("reasoning", "")
@@ -166,6 +181,14 @@ class LLMBrainReward:
 
             return response, thinking
 
+    def formatted_insights(self) -> str:
+        if not self.insights:
+            return "\nNo insights available."
+        insights_str = ""
+        for idx, insight in enumerate(self.insights):
+            insights_str += f"{idx + 1}. {insight}\n"
+        return insights_str
+
     def llm_update_parameters_num_optim_semantics(
         self,
         params: np.ndarray,
@@ -192,6 +215,7 @@ class LLMBrainReward:
                 "response_schema": self.response_schema_json,
                 "target_params_string": np.array2string(params, separator=', '),
                 "reward_range": reward_range,
+                "memory_string": self.formatted_insights(),
             }
         )
 
@@ -207,7 +231,25 @@ class LLMBrainReward:
             print("Validation error:", e)
             raise e
 
+        if validated_response.insight is not None:
+            print("*"*50)
+            print("Insight received:", validated_response.insight)
+            print("*"*50)
+            operation = validated_response.insight.operation
+            if operation == Operation.CREATE:
+                self.insights.append(validated_response.insight.description)
+            elif operation == Operation.MODIFY:
+                if validated_response.insight.insightId is not None and 0 < validated_response.insight.insightId <= len(self.insights):
+                    self.insights[int(validated_response.insight.insightId) - 1] = validated_response.insight.description
+            elif operation == Operation.DELETE:
+                if validated_response.insight.insightId is not None and 0 < validated_response.insight.insightId <= len(self.insights):
+                    del self.insights[int(validated_response.insight.insightId) - 1]
+            # self.memory.append(validated_response.insight)
+
         # print(system_prompt)
+
+        with open(f"memory_log.txt", "w") as memory_log_file:
+            memory_log_file.write(self.formatted_insights())
 
         # self.add_llm_conversation(new_parameters_with_reasoning, "assistant")
         # self.add_llm_conversation(

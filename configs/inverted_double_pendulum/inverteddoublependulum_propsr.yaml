@@ -2,7 +2,7 @@ task: cont_state_llm_num_reward
 num_episodes: 400
 gym_env_name: InvertedDoublePendulum-v5
 render_mode: null
-logdir: reward-logs/propsr-simulated/inverteddoublependulum
+logdir: reward-logs/nn-simulated/inverteddoublependulum/trial_1
 dim_actions: 1
 dim_states: 9
 max_traj_count: 70
@@ -25,3 +25,4 @@ summary: false
 memory_strategy: default
 dataset_file: idp-simulated-params.txt
 reward_range: (0, 10000]
+run_nn_train: true

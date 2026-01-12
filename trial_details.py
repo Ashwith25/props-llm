@@ -1,4 +1,4 @@
-path = "reward-logs/nn-simulated/invertedpendulum/trial_1/overall_log.txt"
+path = "/scratch/apoojar4/propsR-sim-log/IDP_propsR/trial_2/overall_log.txt"
 
 import pandas as pd
 import numpy as np
@@ -20,7 +20,7 @@ with open(path, 'r') as f:
         data[f'sample_{i*part_size}_{(i+1)*part_size}'] = df
 
 print("\n" + "="*70)
-tolerance = 30
+tolerance = 50
 print("SUMMARY STATISTICS with tolerance of", tolerance)
 print("="*70)
 print(f"{'Sample':<15}\t | {'MAE':<8} | {'RMSE':<8} | {'Corr':<8} | {'Avg Conf':<10} | {'Accuracy':<10}")

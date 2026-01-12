@@ -7,10 +7,10 @@ import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 
 # Base path for propsR logs
-base_path = 'reward-logs/nn-simulated/invertedpendulum'
-pdf_path = 'reward-plots/nn-simulated/invertedpendulum/propsR_comprehensive_analysis.pdf'
+base_path = '/scratch/apoojar4/propsR-sim-log/MCD_propsR'
+pdf_path = 'reward-plots/propsR_sim_log/MCD_propsR/propsR_comprehensive_analysis.pdf'
 
-trials = ['trial_1']
+trials = ['trial_1', 'trial_2', 'trial_3']
 
 # Load data from all trials
 data = {}

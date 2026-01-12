@@ -3,8 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-LOG_DIR = "reward-logs/nn-simulated/invertedpendulum"
-PLOT_DIR = f'reward-plots/nn-simulated/invertedpendulum/'
+LOG_DIR = "reward-logs/nn-simulated/mountaincar"
+PLOT_DIR = f'reward-plots/nn-simulated/mountaincar/'
 main_df = pd.DataFrame()
 max_df = pd.DataFrame()
 for directory in os.listdir(LOG_DIR):

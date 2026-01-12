@@ -2,7 +2,7 @@ task: cont_state_llm_num_reward
 num_episodes: 400
 gym_env_name: MountainCar-v0
 render_mode: null
-logdir: reward-logs/propsr-simulated/mountaincar
+logdir: reward-logs/nn-simulated/mountaincar/trial_1
 dim_actions: 3
 dim_states: 2
 max_traj_count: 70
@@ -25,3 +25,4 @@ summary: false
 memory_strategy: default
 dataset_file: mcd-simulated-params.txt
 reward_range: '[-200, -100)'
+run_nn_train: true

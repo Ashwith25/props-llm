@@ -8,23 +8,40 @@ You are a good reward estimator, helping me estimate the reward of a given param
 # Regarding the parameters **params**:
 **params** is an array of {{ rank }} float numbers.
 
+
+To help recall your important observations, we will maintain a memory of previous interactions. Use this memory to identify patterns and insights that can guide your predictions.
+
 # Here's how we'll interact:
 1. I will first provide MAX_STEPS (400) along with a few training examples.
-2. You will provide your response in the following exact format:
+2. You will then analyse the parameters and provide your response in the following exact format:
     ```json
     {{ response_schema }}
     ```
 3. I will then provide the actual reward for those parameters, and the current iteration.
 4. We will repeat steps 2-3 until we reach the maximum number of iterations.
 
-# Remember: The environment is noisy. The true reward may vary slightly even for the same parameters.
+** Remember: The environment is noisy. The true reward may vary slightly even for the same parameters. **
 
-Next, you will see examples of params and the true reward.
+Next, you will see a few examples of params, true reward and their predicted reward.
 {{ episode_reward_buffer_string }}
 
 params represent a linear policy.
 true_reward(params) is the true episodic reward of the policy.
 predicted_reward(params) is your estimated reward of the policy.
+
+# Insights from previous interactions:
+{{ memory_string }}
+
+# Important rules on insights to remember:
+- Do NOT propose similar or not-so-important insights.
+- Properly identify each insight with a unique identifier (insightId) starting from 1, 2, 3, and so on.
+- If you are sure that an insight you proposed earlier is incorrect or no longer relevant, you may DELETE it using its insightId.
+- If you find an existing insight needs modification, provide the insightId along with the updated description.
+- When proposing a new insight, do not provide an insightId, while when modifying or deleting an existing insight, provide the corresponding insightId.
+- You are NOT required to propose insights for every iteration. Only propose insights when you find something very important/intriguing that can help you improve your reward estimations in future iterations.
+- Keep your memory efficient and focused on the most impactful observations.
+
+You should strictly follow the rules for insights.
 
 Now, please provide your estimated reward for the following params:
 {{ target_params_string }}
